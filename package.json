@@ -1,8 +1,8 @@
 {
-  "name": "clinic-appointment-queue-saas",
+  "name": "hospital-management-system-saas",
   "version": "1.0.0",
   "private": true,
-  "description": "Multi-Tenant Clinic Appointment Scheduling and Queue Management SaaS",
+  "description": "HospitalManagementSystem - Multi-Tenant SaaS",
   "workspaces": [
     "backend",
     "frontend"

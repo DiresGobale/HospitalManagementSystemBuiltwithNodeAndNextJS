@@ -1,4 +1,4 @@
-# CAQMS - Multi-Tenant Clinic Appointment & Queue Management SaaS
+# HospitalManagementSystem - Multi-Tenant SaaS
 
 Production-oriented, multi-tenant clinic appointment scheduling and real-time queue management SaaS platform built with Next.js (App Router), Express.js, PostgreSQL (Prisma ORM), Redis, and Socket.IO.
 
