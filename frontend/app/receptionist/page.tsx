@@ -6,6 +6,12 @@ import { useAuth } from '../../lib/auth-context';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { apiFetch } from '../../lib/api';
 import {
+  sanitizeNameInput,
+  sanitizePhoneInput,
+  validatePersonName,
+  validateEthiopianPhone,
+} from '../../lib/validation';
+import {
   ClipboardList,
   Search,
   UserPlus,
@@ -389,12 +395,24 @@ export default function ReceptionistDashboardPage() {
     e.preventDefault();
     setNewPtMsg(null);
 
+    const nameVal = validatePersonName(newPtName);
+    if (!nameVal.valid) {
+      setNewPtMsg({ type: 'error', text: nameVal.error || 'Invalid patient name. Letters and characters only.' });
+      return;
+    }
+    const phoneVal = validateEthiopianPhone(newPtPhone);
+    if (!phoneVal.valid) {
+      setNewPtMsg({ type: 'error', text: phoneVal.error || 'Invalid phone. Must be a valid Ethiopian phone number (09... or 07...).' });
+      return;
+    }
+
     try {
       const res = await apiFetch('/patients', {
         method: 'POST',
+        clinicId: activeMembership?.clinicId,
         body: JSON.stringify({
-          fullName: newPtName,
-          phone: newPtPhone,
+          fullName: newPtName.trim(),
+          phone: phoneVal.normalizedPhone || newPtPhone.trim(),
           email: newPtEmail || null,
           dateOfBirth: newPtDob || null,
           gender: newPtGender,
@@ -588,13 +606,25 @@ export default function ReceptionistDashboardPage() {
     e.preventDefault();
     if (!editingPatient) return;
 
+    const nameVal = validatePersonName(editingPatient.fullName || '');
+    if (!nameVal.valid) {
+      alert(nameVal.error || 'Invalid patient name. Letters and characters only.');
+      return;
+    }
+    const phoneVal = validateEthiopianPhone(editingPatient.phone || '');
+    if (!phoneVal.valid) {
+      alert(phoneVal.error || 'Invalid phone. Must be a valid Ethiopian phone number (09... or 07...).');
+      return;
+    }
+
     setIsSavingPatient(true);
     try {
       const res = await apiFetch(`/patients/${editingPatient.id}`, {
         method: 'PATCH',
+        clinicId: activeMembership?.clinicId,
         body: JSON.stringify({
-          fullName: editingPatient.fullName,
-          phone: editingPatient.phone,
+          fullName: editingPatient.fullName.trim(),
+          phone: phoneVal.normalizedPhone || editingPatient.phone.trim(),
           email: editingPatient.email || null,
           address: editingPatient.address || null,
           gender: editingPatient.gender || null,
@@ -647,6 +677,26 @@ export default function ReceptionistDashboardPage() {
       return;
     }
 
+    const nameVal = validatePersonName(addPtFullName);
+    if (!nameVal.isValid) {
+      setActionFeedback({ type: 'error', text: nameVal.message });
+      return;
+    }
+
+    const phoneVal = validateEthiopianPhone(addPtPhone);
+    if (!phoneVal.isValid) {
+      setActionFeedback({ type: 'error', text: `Primary Phone: ${phoneVal.message}` });
+      return;
+    }
+
+    if (addPtEmergencyContact.trim()) {
+      const emergencyVal = validateEthiopianPhone(addPtEmergencyContact);
+      if (!emergencyVal.isValid) {
+        setActionFeedback({ type: 'error', text: `Emergency Contact: ${emergencyVal.message}` });
+        return;
+      }
+    }
+
     setIsSubmittingNewPatient(true);
     setActionFeedback(null);
 
@@ -654,17 +704,18 @@ export default function ReceptionistDashboardPage() {
       // 1. Create Patient Record in Hospital DB
       const ptPayload: any = {
         fullName: addPtFullName.trim(),
-        phone: addPtPhone.trim(),
+        phone: phoneVal.normalized,
         gender: addPtGender,
       };
       if (addPtEmail.trim()) ptPayload.email = addPtEmail.trim();
       if (addPtDateOfBirth) ptPayload.dateOfBirth = addPtDateOfBirth;
       if (addPtAddress.trim()) ptPayload.address = addPtAddress.trim();
       if (addPtBloodGroup.trim()) ptPayload.bloodGroup = addPtBloodGroup.trim();
-      if (addPtEmergencyContact.trim()) ptPayload.emergencyContact = addPtEmergencyContact.trim();
+      if (addPtEmergencyContact.trim()) ptPayload.emergencyContact = validateEthiopianPhone(addPtEmergencyContact).normalized;
 
       const ptRes = await apiFetch('/patients', {
         method: 'POST',
+        clinicId: activeMembership?.clinicId,
         body: JSON.stringify(ptPayload),
       });
 
@@ -1423,26 +1474,30 @@ export default function ReceptionistDashboardPage() {
                   )}
 
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Full Name *</label>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Full Name * <span className="text-slate-400 font-normal">(Letters & chars only)</span>
+                    </label>
                     <input
                       type="text"
                       required
                       placeholder="e.g. Samuel Alemu"
                       value={newPtName}
-                      onChange={(e) => setNewPtName(e.target.value)}
+                      onChange={(e) => setNewPtName(sanitizeNameInput(e.target.value))}
                       className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-amber-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Phone Number *</label>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Phone Number * <span className="text-slate-400 font-normal">(Ethiopian 09 / 07... numbers only)</span>
+                    </label>
                     <input
                       type="tel"
                       required
-                      placeholder="+251 911 000000"
+                      placeholder="0911223344 or +251911223344"
                       value={newPtPhone}
-                      onChange={(e) => setNewPtPhone(e.target.value)}
-                      className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-amber-500"
+                      onChange={(e) => setNewPtPhone(sanitizePhoneInput(e.target.value))}
+                      className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-amber-500 font-mono"
                     />
                   </div>
 
@@ -2299,24 +2354,29 @@ export default function ReceptionistDashboardPage() {
 
             <div className="flex-1 overflow-y-auto min-h-0 pr-1 py-3 space-y-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Full Name <span className="text-slate-400 font-normal">(Letters & chars only)</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={editingPatient.fullName || ''}
-                  onChange={(e) => setEditingPatient({ ...editingPatient, fullName: e.target.value })}
+                  onChange={(e) => setEditingPatient({ ...editingPatient, fullName: sanitizeNameInput(e.target.value) })}
                   className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-amber-500 font-medium"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Phone Number</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Phone Number <span className="text-slate-400 font-normal">(Ethiopian 09 / 07... numbers only)</span>
+                </label>
                 <input
                   type="tel"
                   required
+                  placeholder="0911223344"
                   value={editingPatient.phone || ''}
-                  onChange={(e) => setEditingPatient({ ...editingPatient, phone: e.target.value })}
-                  className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-amber-500 font-medium"
+                  onChange={(e) => setEditingPatient({ ...editingPatient, phone: sanitizePhoneInput(e.target.value) })}
+                  className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-amber-500 font-mono font-medium"
                 />
               </div>
 
@@ -2444,28 +2504,28 @@ export default function ReceptionistDashboardPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Full Name <span className="text-rose-500">*</span>
+                      Full Name <span className="text-rose-500">*</span> <span className="text-slate-400 font-normal">(Letters & chars only)</span>
                     </label>
                     <input
                       type="text"
                       required
                       placeholder="e.g. Abebe Bekele"
                       value={addPtFullName}
-                      onChange={(e) => setAddPtFullName(e.target.value)}
+                      onChange={(e) => setAddPtFullName(sanitizeNameInput(e.target.value))}
                       className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-emerald-500 font-medium bg-white"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Phone Number <span className="text-rose-500">*</span>
+                      Phone Number <span className="text-rose-500">*</span> <span className="text-slate-400 font-normal">(Ethiopian 09 / 07... numbers only)</span>
                     </label>
                     <input
                       type="tel"
                       required
                       placeholder="e.g. 0911223344"
                       value={addPtPhone}
-                      onChange={(e) => setAddPtPhone(e.target.value)}
+                      onChange={(e) => setAddPtPhone(sanitizePhoneInput(e.target.value))}
                       className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-emerald-500 font-mono font-medium bg-white"
                     />
                   </div>
@@ -2535,7 +2595,9 @@ export default function ReceptionistDashboardPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Emergency Contact Person</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Emergency Contact Person <span className="text-slate-400 font-normal">(Phone digits or name)</span>
+                    </label>
                     <input
                       type="text"
                       placeholder="e.g. Sister / Parent (0922334455)"

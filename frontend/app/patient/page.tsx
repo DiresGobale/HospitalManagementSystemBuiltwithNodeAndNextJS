@@ -6,6 +6,12 @@ import { useAuth } from '../../lib/auth-context';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { apiFetch } from '../../lib/api';
 import {
+  sanitizeNameInput,
+  sanitizePhoneInput,
+  validatePersonName,
+  validateEthiopianPhone,
+} from '../../lib/validation';
+import {
   Calendar,
   Clock,
   Ticket,
@@ -147,12 +153,13 @@ export default function PatientPortalPage() {
     setIsDataLoading(true);
 
     try {
+      const clinicId = activeMembership.clinicId;
       const [meRes, apptRes, srvRes, docRes, brRes] = await Promise.all([
-        apiFetch('/patients/me'),
-        apiFetch('/appointments'),
-        apiFetch('/services'),
-        apiFetch('/doctors'),
-        apiFetch('/clinics/current/branches'),
+        apiFetch('/patients/me', { clinicId }),
+        apiFetch('/appointments', { clinicId }),
+        apiFetch('/services', { clinicId }),
+        apiFetch('/doctors', { clinicId }),
+        apiFetch('/clinics/current/branches', { clinicId }),
       ]);
 
       // 1. Process Patient Record from /patients/me
@@ -286,7 +293,7 @@ export default function PatientPortalPage() {
           duration: '30',
           ...(selectedService ? { serviceId: selectedService } : {}),
         });
-        const res = await apiFetch(`/doctors/${selectedDoctor}/availability?${queryParams.toString()}`);
+        const res = await apiFetch(`/doctors/${selectedDoctor}/availability?${queryParams.toString()}`, { clinicId: activeMembership?.clinicId });
         if (res.success && res.data?.slots) {
           const slotsList = res.data.slots.filter((s: any) => s.isAvailable !== false);
           setAvailableSlots(slotsList);
@@ -325,7 +332,7 @@ export default function PatientPortalPage() {
       }
       setIsLoadingRescheduleSlots(true);
       try {
-        const res = await apiFetch(`/doctors/${reschedulingAppt.doctorId}/availability?date=${rescheduleDate}&duration=30`);
+        const res = await apiFetch(`/doctors/${reschedulingAppt.doctorId}/availability?date=${rescheduleDate}&duration=30`, { clinicId: activeMembership?.clinicId });
         if (res.success && res.data?.slots) {
           const slotsList = res.data.slots.filter((s: any) => s.isAvailable !== false);
           setRescheduleSlots(slotsList);
@@ -402,6 +409,21 @@ export default function PatientPortalPage() {
       }
     }
 
+    if (paymentPayerName.trim()) {
+      const nameVal = validatePersonName(paymentPayerName);
+      if (!nameVal.isValid) {
+        setBookingMsg({ type: 'error', text: `Payer Name: ${nameVal.message}` });
+        return;
+      }
+    }
+    if (paymentPayerPhone.trim()) {
+      const phoneVal = validateEthiopianPhone(paymentPayerPhone);
+      if (!phoneVal.isValid) {
+        setBookingMsg({ type: 'error', text: `Payer Phone: ${phoneVal.message}` });
+        return;
+      }
+    }
+
     setIsBooking(true);
     setBookingMsg(null);
 
@@ -411,6 +433,7 @@ export default function PatientPortalPage() {
     try {
       const res = await apiFetch('/appointments', {
         method: 'POST',
+        clinicId: activeMembership?.clinicId,
         body: JSON.stringify({
           patientId: patientRecord?.id,
           doctorId: selectedDoctor,
@@ -569,21 +592,47 @@ export default function PatientPortalPage() {
   // Handle Updating Medical Profile in DB
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (profileFullName.trim()) {
+      const nameVal = validatePersonName(profileFullName);
+      if (!nameVal.isValid) {
+        setProfileMsg({ type: 'error', text: `Full Name: ${nameVal.message}` });
+        return;
+      }
+    }
+
+    if (profilePhone.trim()) {
+      const phoneVal = validateEthiopianPhone(profilePhone);
+      if (!phoneVal.isValid) {
+        setProfileMsg({ type: 'error', text: `Phone: ${phoneVal.message}` });
+        return;
+      }
+    }
+
+    if (profileEmergencyContact.trim()) {
+      const emergencyVal = validateEthiopianPhone(profileEmergencyContact);
+      if (!emergencyVal.isValid) {
+        setProfileMsg({ type: 'error', text: `Emergency Contact: ${emergencyVal.message}` });
+        return;
+      }
+    }
+
     setIsSavingProfile(true);
     setProfileMsg(null);
 
     try {
       const res = await apiFetch('/patients/me', {
         method: 'PATCH',
+        clinicId: activeMembership?.clinicId,
         body: JSON.stringify({
-          fullName: profileFullName,
-          phone: profilePhone,
-          address: profileAddress,
+          fullName: profileFullName.trim(),
+          phone: profilePhone.trim() ? validateEthiopianPhone(profilePhone).normalized : profilePhone.trim(),
+          address: profileAddress.trim(),
           gender: profileGender,
           dateOfBirth: profileDob || undefined,
           bloodGroup: profileBloodGroup,
           allergies: profileAllergies,
-          emergencyContact: profileEmergencyContact,
+          emergencyContact: profileEmergencyContact.trim() ? validateEthiopianPhone(profileEmergencyContact).normalized : undefined,
         }),
       });
 
@@ -1734,32 +1783,38 @@ export default function PatientPortalPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      {paymentMethod === 'TELEBIRR' ? 'Sender Phone (Telebirr)' : 'Sender Account / Phone'}
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold text-slate-700">
+                        {paymentMethod === 'TELEBIRR' ? 'Sender Phone (Telebirr)' : 'Sender Account / Phone'}
+                      </label>
+                      <span className="text-[10px] text-blue-600 font-semibold">Numbers only</span>
+                    </div>
                     <input
                       type="text"
                       placeholder={paymentMethod === 'TELEBIRR' ? '0911223344' : 'Account or Phone'}
                       value={paymentMethod === 'TELEBIRR' ? paymentPayerPhone : (paymentPayerAccount || paymentPayerPhone)}
                       onChange={(e) => {
                         if (paymentMethod === 'TELEBIRR') {
-                          setPaymentPayerPhone(e.target.value);
+                          setPaymentPayerPhone(sanitizePhoneInput(e.target.value));
                         } else {
                           setPaymentPayerAccount(e.target.value);
                         }
                       }}
-                      className="w-full text-xs border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500"
+                      className="w-full text-xs border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 font-mono"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Depositor / Payer Name</label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold text-slate-700">Depositor / Payer Name</label>
+                      <span className="text-[10px] text-slate-400">Letters only</span>
+                    </div>
                     <input
                       type="text"
-                      placeholder="Full Name on Account"
+                      placeholder="e.g. Abebe Kebede"
                       value={paymentPayerName}
-                      onChange={(e) => setPaymentPayerName(e.target.value)}
-                      className="w-full text-xs border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500"
+                      onChange={(e) => setPaymentPayerName(sanitizeNameInput(e.target.value))}
+                      className="w-full text-xs border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 font-medium"
                     />
                   </div>
                 </div>
@@ -2367,12 +2422,15 @@ export default function PatientPortalPage() {
             <form onSubmit={handleUpdateProfile} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Full Legal Name</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-slate-700">Full Legal Name</label>
+                    <span className="text-[10px] text-slate-400">Letters only</span>
+                  </div>
                   <input
                     type="text"
                     required
                     value={profileFullName}
-                    onChange={(e) => setProfileFullName(e.target.value)}
+                    onChange={(e) => setProfileFullName(sanitizeNameInput(e.target.value))}
                     className="w-full text-xs border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 font-medium"
                   />
                 </div>
@@ -2390,13 +2448,16 @@ export default function PatientPortalPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Phone Number (Mandatory)</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-slate-700">Phone Number (Mandatory)</label>
+                    <span className="text-[10px] text-blue-600 font-semibold">Ethiopian (09 / 07...)</span>
+                  </div>
                   <input
                     type="tel"
                     required
-                    placeholder="+1 555-0199"
+                    placeholder="0911234567 or +251911234567"
                     value={profilePhone}
-                    onChange={(e) => setProfilePhone(e.target.value)}
+                    onChange={(e) => setProfilePhone(sanitizePhoneInput(e.target.value))}
                     className="w-full text-xs border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 font-medium"
                   />
                 </div>
@@ -2446,13 +2507,16 @@ export default function PatientPortalPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Emergency Contact (Name & Phone)</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">Emergency Contact Phone</label>
+                  <span className="text-[10px] text-slate-400">Numbers only</span>
+                </div>
                 <input
-                  type="text"
-                  placeholder="e.g. Jane Doe (Spouse) - 555-0144"
+                  type="tel"
+                  placeholder="0911234567 or +251911234567"
                   value={profileEmergencyContact}
-                  onChange={(e) => setProfileEmergencyContact(e.target.value)}
-                  className="w-full text-xs border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500"
+                  onChange={(e) => setProfileEmergencyContact(sanitizePhoneInput(e.target.value))}
+                  className="w-full text-xs border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 font-medium"
                 />
               </div>
 

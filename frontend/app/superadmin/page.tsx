@@ -7,6 +7,12 @@ import { useAuth } from '../../lib/auth-context';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { apiFetch } from '../../lib/api';
 import {
+  sanitizeNameInput,
+  sanitizePhoneInput,
+  validatePersonName,
+  validateEthiopianPhone,
+} from '../../lib/validation';
+import {
   ShieldAlert,
   Building2,
   Users,
@@ -116,13 +122,26 @@ export default function SuperAdminPage() {
     setIsSubmitting(true);
     setModalMsg(null);
 
+    const adminNameVal = validatePersonName(adminName);
+    if (!adminNameVal.valid) {
+      setModalMsg({ type: 'error', text: adminNameVal.error || 'Invalid administrator name. Letters only.' });
+      setIsSubmitting(false);
+      return;
+    }
+    const phoneVal = validateEthiopianPhone(phone);
+    if (!phoneVal.valid) {
+      setModalMsg({ type: 'error', text: phoneVal.error || 'Invalid clinic phone. Must be a valid Ethiopian phone number (09... or 07...).' });
+      setIsSubmitting(false);
+      return;
+    }
+
     const res = await apiFetch('/clinics', {
       method: 'POST',
       body: JSON.stringify({
         name: name.trim(),
         slug: slug.trim(),
         email: email.trim(),
-        phone: phone.trim(),
+        phone: phoneVal.normalizedPhone || phone.trim(),
         address: address.trim(),
         timezone: 'UTC',
         adminFullName: adminName.trim(),
@@ -636,14 +655,16 @@ export default function SuperAdminPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Phone Number *</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Phone Number * <span className="text-slate-400 font-normal">(Ethiopian 09 / 07...)</span>
+                    </label>
                     <input
                       type="tel"
                       required
-                      placeholder="0995774866"
+                      placeholder="0911223344"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 bg-white outline-none focus:border-purple-600"
+                      onChange={(e) => setPhone(sanitizePhoneInput(e.target.value))}
+                      className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 bg-white outline-none focus:border-purple-600 font-mono"
                     />
                   </div>
                 </div>
@@ -668,13 +689,15 @@ export default function SuperAdminPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Admin Full Name *</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Admin Full Name * <span className="text-slate-400 font-normal">(Letters only)</span>
+                    </label>
                     <input
                       type="text"
                       required
                       placeholder="Dr. Admin Name"
                       value={adminName}
-                      onChange={(e) => setAdminName(e.target.value)}
+                      onChange={(e) => setAdminName(sanitizeNameInput(e.target.value))}
                       className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 bg-white outline-none focus:border-purple-600"
                     />
                   </div>

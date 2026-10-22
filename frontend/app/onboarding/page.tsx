@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Navbar } from '../../components/Navbar';
 import { apiFetch } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
+import {
+  sanitizeNameInput,
+  sanitizePhoneInput,
+  validatePersonName,
+  validateEthiopianPhone,
+} from '../../lib/validation';
 import { Building, Shield, CheckCircle, ArrowRight } from 'lucide-react';
 
 export default function OnboardingPage() {
@@ -40,16 +46,29 @@ export default function OnboardingPage() {
     setIsSubmitting(true);
     setErrorMsg('');
 
+    const adminNameVal = validatePersonName(adminName);
+    if (!adminNameVal.valid) {
+      setErrorMsg(adminNameVal.error || 'Invalid admin name. Letters and characters only.');
+      setIsSubmitting(false);
+      return;
+    }
+    const phoneVal = validateEthiopianPhone(clinicPhone);
+    if (!phoneVal.valid) {
+      setErrorMsg(phoneVal.error || 'Invalid clinic phone. Must be a valid Ethiopian phone number (09... or 07...).');
+      setIsSubmitting(false);
+      return;
+    }
+
     const res = await apiFetch('/clinics', {
       method: 'POST',
       body: JSON.stringify({
         name: clinicName,
         slug,
         email: clinicEmail,
-        phone: clinicPhone,
+        phone: phoneVal.normalizedPhone || clinicPhone,
         address: clinicAddress,
         timezone,
-        adminFullName: adminName,
+        adminFullName: adminName.trim(),
         adminEmail,
         adminPassword,
       }),
@@ -136,14 +155,16 @@ export default function OnboardingPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Contact Phone</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Contact Phone <span className="text-slate-400 font-normal">(Ethiopian 09 / 07... numbers only)</span>
+                  </label>
                   <input
                     type="tel"
                     required
                     value={clinicPhone}
-                    onChange={(e) => setClinicPhone(e.target.value)}
-                    placeholder="+1-555-0199"
-                    className="w-full text-sm border border-slate-300 rounded-lg p-2.5 outline-none focus:border-blue-500"
+                    onChange={(e) => setClinicPhone(sanitizePhoneInput(e.target.value))}
+                    placeholder="0911223344 or +251911223344"
+                    className="w-full text-sm border border-slate-300 rounded-lg p-2.5 outline-none focus:border-blue-500 font-mono"
                   />
                 </div>
 
@@ -169,12 +190,14 @@ export default function OnboardingPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Admin Full Name</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Admin Full Name <span className="text-slate-400 font-normal">(Letters & chars only)</span>
+                  </label>
                   <input
                     type="text"
                     required
                     value={adminName}
-                    onChange={(e) => setAdminName(e.target.value)}
+                    onChange={(e) => setAdminName(sanitizeNameInput(e.target.value))}
                     placeholder="Dr. Gregory Owner"
                     className="w-full text-sm border border-slate-300 rounded-lg p-2.5 outline-none focus:border-purple-500"
                   />

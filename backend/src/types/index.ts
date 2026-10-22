@@ -318,11 +318,16 @@ export const loginSchema = z.object({
   password: z.string().min(8),
 });
 
+// Ethiopian standard phone regex (09... or 07... 10 digits, or +251 9/7...)
+export const ethiopianPhoneRegex = /^(?:\+251|251|0)?([97]\d{8})$/;
+// Name regex: only alphabetic characters, spaces, and standard name punctuation
+export const personNameRegex = /^[A-Za-z\s.'\-\u1200-\u137F]+$/;
+
 export const registerPatientSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  fullName: z.string().min(2),
-  phone: z.string().min(3).optional().nullable(),
+  fullName: z.string().min(2).regex(personNameRegex, 'Full name can only contain alphabetic characters and spaces'),
+  phone: z.string().regex(ethiopianPhoneRegex, 'Must be a valid Ethiopian phone number (e.g. 0911234567 or +251911234567)').optional().nullable(),
   dateOfBirth: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
   gender: z.string().optional().nullable(),
@@ -332,16 +337,16 @@ export const registerPatientSchema = z.object({
 
 export const inviteStaffSchema = z.object({
   email: z.string().email(),
-  fullName: z.string().min(2),
+  fullName: z.string().min(2).regex(personNameRegex, 'Full name can only contain alphabetic characters and spaces'),
   role: z.enum([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.DOCTOR, ROLES.RECEPTIONIST, ROLES.PHARMACIST, ROLES.SPECIALIST, ROLES.LABORATORY, ROLES.NURSING]),
   branchId: z.string().uuid().optional(),
   specialty: z.string().optional(),
 });
 
 export const createUserSchema = z.object({
-  fullName: z.string().min(2, 'Full name must be at least 2 characters'),
+  fullName: z.string().min(2, 'Full name must be at least 2 characters').regex(personNameRegex, 'Full name can only contain alphabetic characters and spaces'),
   email: z.string().email('Invalid email address'),
-  phone: z.string().min(3, 'Phone number is required'),
+  phone: z.string().regex(ethiopianPhoneRegex, 'Must be a valid Ethiopian phone number (e.g. 0911234567 or +251911234567)'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   department: z.string().min(1, 'Department is required'),
   role: z.enum([
@@ -382,11 +387,11 @@ export const createClinicSchema = z.object({
   name: z.string().min(2),
   slug: z.string().min(2).regex(/^[a-z0-9-]+$/),
   email: z.string().email(),
-  phone: z.string().min(5),
+  phone: z.string().regex(ethiopianPhoneRegex, 'Must be a valid Ethiopian phone number (e.g. 0911234567 or +251911234567)'),
   address: z.string().min(3),
   timezone: z.string().default('UTC'),
   logoUrl: z.string().url().optional(),
-  adminFullName: z.string().min(2),
+  adminFullName: z.string().min(2).regex(personNameRegex, 'Admin full name can only contain alphabetic characters and spaces'),
   adminEmail: z.string().email(),
   adminPassword: z.string().min(8),
 });
@@ -394,7 +399,7 @@ export const createClinicSchema = z.object({
 export const updateClinicSchema = z.object({
   name: z.string().min(2).optional(),
   email: z.string().email().optional(),
-  phone: z.string().min(5).optional(),
+  phone: z.string().regex(ethiopianPhoneRegex, 'Must be a valid Ethiopian phone number').optional(),
   address: z.string().min(3).optional(),
   timezone: z.string().optional(),
   logoUrl: z.string().url().optional().nullable(),
@@ -414,14 +419,14 @@ export const updateClinicSettingsSchema = z.object({
 export const createBranchSchema = z.object({
   name: z.string().min(2),
   address: z.string().min(3),
-  phone: z.string().min(5),
+  phone: z.string().regex(ethiopianPhoneRegex, 'Must be a valid Ethiopian phone number (e.g. 0911234567 or +251911234567)'),
   isMain: z.boolean().default(false),
 });
 
 export const createPatientSchema = z.object({
-  fullName: z.string().min(2),
+  fullName: z.string().min(2).regex(personNameRegex, 'Full name can only contain alphabetic characters and spaces'),
   email: z.string().email().optional().nullable(),
-  phone: z.string().min(5),
+  phone: z.string().regex(ethiopianPhoneRegex, 'Must be a valid Ethiopian phone number (e.g. 0911234567 or +251911234567)'),
   dateOfBirth: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
   gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional().nullable(),
@@ -439,9 +444,9 @@ export const searchPatientSchema = z.object({
 });
 
 export const createDoctorSchema = z.object({
-  fullName: z.string().min(2),
+  fullName: z.string().min(2).regex(personNameRegex, 'Full name can only contain alphabetic characters and spaces'),
   email: z.string().email(),
-  phone: z.string().min(5),
+  phone: z.string().regex(ethiopianPhoneRegex, 'Must be a valid Ethiopian phone number (e.g. 0911234567 or +251911234567)'),
   specialty: z.string().min(2),
   licenseNumber: z.string().optional().nullable(),
   branchId: z.string().uuid(),
@@ -450,8 +455,8 @@ export const createDoctorSchema = z.object({
 });
 
 export const updateDoctorSchema = z.object({
-  fullName: z.string().min(2).optional(),
-  phone: z.string().min(5).optional(),
+  fullName: z.string().min(2).regex(personNameRegex, 'Full name can only contain alphabetic characters and spaces').optional(),
+  phone: z.string().regex(ethiopianPhoneRegex, 'Must be a valid Ethiopian phone number').optional(),
   specialty: z.string().min(2).optional(),
   licenseNumber: z.string().optional().nullable(),
   branchId: z.string().uuid().optional(),
@@ -499,9 +504,9 @@ export const updateServiceSchema = createServiceSchema.partial();
 export const appointmentPaymentInputSchema = z.object({
   method: z.enum(['TELEBIRR', 'CBE', 'CASH', 'CARD']),
   transactionRef: z.string().min(3, 'Transaction reference number is required'),
-  payerPhone: z.string().optional().nullable(),
+  payerPhone: z.string().regex(ethiopianPhoneRegex, 'Must be a valid Ethiopian phone number').optional().nullable(),
   payerAccount: z.string().optional().nullable(),
-  payerName: z.string().optional().nullable(),
+  payerName: z.string().regex(personNameRegex, 'Payer name can only contain alphabetic characters and spaces').optional().nullable(),
   amount: z.number().min(0).optional(),
   notes: z.string().optional().nullable(),
 });

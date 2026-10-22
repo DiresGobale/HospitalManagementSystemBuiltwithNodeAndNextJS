@@ -7,6 +7,12 @@ import { useAuth } from '../../lib/auth-context';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { apiFetch } from '../../lib/api';
 import {
+  sanitizeNameInput,
+  sanitizePhoneInput,
+  validatePersonName,
+  validateEthiopianPhone,
+} from '../../lib/validation';
+import {
   Users,
   Calendar,
   Activity,
@@ -178,13 +184,26 @@ export default function AdminDashboardPage() {
     setIsSubmittingClinic(true);
     setCreateClinicMsg('');
 
+    const adminNameVal = validatePersonName(newAdminName);
+    if (!adminNameVal.valid) {
+      setCreateClinicMsg(adminNameVal.error || 'Invalid administrator name. Letters and characters only.');
+      setIsSubmittingClinic(false);
+      return;
+    }
+    const phoneVal = validateEthiopianPhone(newClinicPhone);
+    if (!phoneVal.valid) {
+      setCreateClinicMsg(phoneVal.error || 'Invalid clinic phone. Must be a valid Ethiopian phone number (09... or 07...).');
+      setIsSubmittingClinic(false);
+      return;
+    }
+
     const res = await apiFetch('/clinics', {
       method: 'POST',
       body: JSON.stringify({
         name: newClinicName.trim(),
         slug: newClinicSlug.trim(),
         email: newClinicEmail.trim(),
-        phone: newClinicPhone.trim(),
+        phone: phoneVal.normalizedPhone || newClinicPhone.trim(),
         address: newClinicAddress.trim(),
         timezone: newClinicTimezone,
         adminFullName: newAdminName.trim(),
@@ -315,13 +334,24 @@ export default function AdminDashboardPage() {
         break;
     }
 
+    const nameVal = validatePersonName(newFullName);
+    if (!nameVal.valid) {
+      setAddUserMsg({ type: 'error', text: nameVal.error || 'Invalid staff name. Letters and characters only.' });
+      return;
+    }
+    const phoneVal = validateEthiopianPhone(newPhone);
+    if (!phoneVal.valid) {
+      setAddUserMsg({ type: 'error', text: phoneVal.error || 'Invalid phone. Must be a valid Ethiopian phone number (09... or 07...).' });
+      return;
+    }
+
     try {
       const res = await apiFetch('/clinics/current/users', {
         method: 'POST',
         body: JSON.stringify({
           fullName: newFullName.trim(),
           email: newEmail.trim().toLowerCase(),
-          phone: newPhone.trim(),
+          phone: phoneVal.normalizedPhone || newPhone.trim(),
           password: newPassword,
           department: newDepartment,
           role: roleEnum,
@@ -355,6 +385,14 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     setIsInviting(true);
     setInviteMsg('');
+
+    const nameVal = validatePersonName(inviteName);
+    if (!nameVal.valid) {
+      setInviteMsg(nameVal.error || 'Invalid staff name. Letters and characters only.');
+      setIsInviting(false);
+      return;
+    }
+
     const res = await apiFetch('/auth/invite', {
       method: 'POST',
       body: JSON.stringify({
@@ -424,13 +462,29 @@ export default function AdminDashboardPage() {
   const handleUpdateUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
+
+    const nameVal = validatePersonName(editingUser.fullName || '');
+    if (!nameVal.valid) {
+      alert(nameVal.error || 'Invalid staff name. Letters and characters only.');
+      return;
+    }
+    let normPhone = editingUser.phone;
+    if (editingUser.phone && editingUser.phone.trim()) {
+      const phoneVal = validateEthiopianPhone(editingUser.phone);
+      if (!phoneVal.valid) {
+        alert(phoneVal.error || 'Invalid phone. Must be a valid Ethiopian phone number (09... or 07...).');
+        return;
+      }
+      normPhone = phoneVal.normalizedPhone || editingUser.phone;
+    }
+
     setIsUpdatingUser(true);
     try {
       const res = await apiFetch(`/clinics/current/members/${editingUser.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
-          fullName: editingUser.fullName,
-          phone: editingUser.phone,
+          fullName: editingUser.fullName.trim(),
+          phone: normPhone ? normPhone.trim() : null,
           department: editingUser.department,
           role: editingUser.role,
           specialty: editingUser.specialty,
@@ -518,12 +572,24 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     setIsSavingBranch(true);
     setBranchMsg('');
+
+    let normPhone = branchPhone;
+    if (branchPhone.trim()) {
+      const phoneVal = validateEthiopianPhone(branchPhone);
+      if (!phoneVal.valid) {
+        setBranchMsg(phoneVal.error || 'Invalid branch phone. Must be a valid Ethiopian phone number (09... or 07...).');
+        setIsSavingBranch(false);
+        return;
+      }
+      normPhone = phoneVal.normalizedPhone || branchPhone;
+    }
+
     const res = await apiFetch('/clinics/current/branches', {
       method: 'POST',
       body: JSON.stringify({
         name: branchName.trim(),
         address: branchAddress.trim(),
-        phone: branchPhone.trim(),
+        phone: normPhone.trim(),
         isMain: branchIsMain,
       }),
     });
@@ -544,12 +610,23 @@ export default function AdminDashboardPage() {
   const handleUpdateBranch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingBranch) return;
+
+    let normPhone = editingBranch.phone;
+    if (editingBranch.phone && editingBranch.phone.trim()) {
+      const phoneVal = validateEthiopianPhone(editingBranch.phone);
+      if (!phoneVal.valid) {
+        alert(phoneVal.error || 'Invalid branch phone. Must be a valid Ethiopian phone number (09... or 07...).');
+        return;
+      }
+      normPhone = phoneVal.normalizedPhone || editingBranch.phone;
+    }
+
     const res = await apiFetch(`/clinics/current/branches/${editingBranch.id}`, {
       method: 'PATCH',
       body: JSON.stringify({
         name: editingBranch.name,
         address: editingBranch.address,
-        phone: editingBranch.phone,
+        phone: normPhone,
         isMain: editingBranch.isMain,
       }),
     });
@@ -579,12 +656,24 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     setIsSavingProfile(true);
     setProfileMsg('');
+
+    let normPhone = clinicPhone;
+    if (clinicPhone.trim()) {
+      const phoneVal = validateEthiopianPhone(clinicPhone);
+      if (!phoneVal.valid) {
+        setProfileMsg(phoneVal.error || 'Invalid hospital phone. Must be a valid Ethiopian phone number (09... or 07...).');
+        setIsSavingProfile(false);
+        return;
+      }
+      normPhone = phoneVal.normalizedPhone || clinicPhone;
+    }
+
     const res = await apiFetch('/clinics/current', {
       method: 'PATCH',
       body: JSON.stringify({
         name: clinicName.trim(),
         email: clinicEmail.trim(),
-        phone: clinicPhone.trim(),
+        phone: normPhone.trim(),
         address: clinicAddress.trim(),
         timezone: clinicTimezone,
       }),
@@ -1338,14 +1427,16 @@ export default function AdminDashboardPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Contact Phone *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Contact Phone * <span className="text-slate-400 font-normal">(Ethiopian 09 / 07... numbers only)</span>
+                </label>
                 <input
                   type="tel"
                   required
-                  placeholder="+1-555-0100"
+                  placeholder="0911223344 or +251911223344"
                   value={branchPhone}
-                  onChange={(e) => setBranchPhone(e.target.value)}
-                  className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 outline-none focus:border-purple-600"
+                  onChange={(e) => setBranchPhone(sanitizePhoneInput(e.target.value))}
+                  className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 outline-none focus:border-purple-600 font-mono"
                 />
               </div>
 
@@ -1738,13 +1829,15 @@ export default function AdminDashboardPage() {
             )}
             <form onSubmit={handleInviteStaff} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Full Name * <span className="text-slate-400 font-normal">(Letters & chars only)</span>
+                </label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Dr. Abebe"
                   value={inviteName}
-                  onChange={(e) => setInviteName(e.target.value)}
+                  onChange={(e) => setInviteName(sanitizeNameInput(e.target.value))}
                   className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 bg-white outline-none focus:border-blue-600"
                 />
               </div>
@@ -1860,14 +1953,14 @@ export default function AdminDashboardPage() {
               {/* Full Name */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Full Name <span className="text-rose-500">*</span>
+                  Full Name <span className="text-rose-500">*</span> <span className="text-slate-400 font-normal">(Letters & chars only)</span>
                 </label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Dr. Abebe Bikila"
                   value={newFullName}
-                  onChange={(e) => setNewFullName(e.target.value)}
+                  onChange={(e) => setNewFullName(sanitizeNameInput(e.target.value))}
                   className="w-full text-xs border border-slate-300 rounded-xl px-3.5 py-2.5 bg-white outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition font-medium"
                 />
               </div>
@@ -1890,15 +1983,15 @@ export default function AdminDashboardPage() {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Phone Number <span className="text-rose-500">*</span>
+                    Phone Number <span className="text-rose-500">*</span> <span className="text-slate-400 font-normal">(Ethiopian 09 / 07... numbers only)</span>
                   </label>
                   <input
                     type="tel"
                     required
                     placeholder="e.g. 0995774866"
                     value={newPhone}
-                    onChange={(e) => setNewPhone(e.target.value)}
-                    className="w-full text-xs border border-slate-300 rounded-xl px-3.5 py-2.5 bg-white outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition font-medium"
+                    onChange={(e) => setNewPhone(sanitizePhoneInput(e.target.value))}
+                    className="w-full text-xs border border-slate-300 rounded-xl px-3.5 py-2.5 bg-white outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition font-mono font-medium"
                   />
                 </div>
               </div>
@@ -2079,13 +2172,16 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Official Contact Phone *</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Official Contact Phone * <span className="text-slate-400 font-normal">(Ethiopian 09 / 07... numbers only)</span>
+                  </label>
                   <input
                     type="tel"
                     required
+                    placeholder="0911223344 or +251911223344"
                     value={clinicPhone}
-                    onChange={(e) => setClinicPhone(e.target.value)}
-                    className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 outline-none focus:border-purple-600"
+                    onChange={(e) => setClinicPhone(sanitizePhoneInput(e.target.value))}
+                    className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 outline-none focus:border-purple-600 font-mono"
                   />
                 </div>
               </div>
@@ -2726,13 +2822,15 @@ export default function AdminDashboardPage() {
 
             <form onSubmit={handleUpdateUserSubmit} className="flex-1 overflow-y-auto min-h-0 py-2 space-y-3.5">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Full Name * <span className="text-slate-400 font-normal">(Letters only)</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={editingUser.fullName}
-                  onChange={(e) => setEditingUser({ ...editingUser, fullName: e.target.value })}
-                  className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 outline-none focus:border-blue-600"
+                  onChange={(e) => setEditingUser({ ...editingUser, fullName: sanitizeNameInput(e.target.value) })}
+                  className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 outline-none focus:border-blue-600 font-medium"
                 />
               </div>
 
@@ -2747,13 +2845,15 @@ export default function AdminDashboardPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Phone Number <span className="text-slate-400 font-normal">(Ethiopian 09 / 07... numbers only)</span>
+                </label>
                 <input
                   type="tel"
                   value={editingUser.phone || ''}
-                  onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
+                  onChange={(e) => setEditingUser({ ...editingUser, phone: sanitizePhoneInput(e.target.value) })}
                   placeholder="e.g. 0911223344"
-                  className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 outline-none focus:border-blue-600"
+                  className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 outline-none focus:border-blue-600 font-mono"
                 />
               </div>
 
@@ -2873,13 +2973,16 @@ export default function AdminDashboardPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Phone</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Phone <span className="text-slate-400 font-normal">(Ethiopian 09 / 07... numbers only)</span>
+                </label>
                 <input
                   type="tel"
                   required
+                  placeholder="0911223344"
                   value={editingBranch.phone}
-                  onChange={(e) => setEditingBranch({ ...editingBranch, phone: e.target.value })}
-                  className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 outline-none focus:border-purple-600"
+                  onChange={(e) => setEditingBranch({ ...editingBranch, phone: sanitizePhoneInput(e.target.value) })}
+                  className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 outline-none focus:border-purple-600 font-mono"
                 />
               </div>
 
@@ -2928,13 +3031,15 @@ export default function AdminDashboardPage() {
 
             <form onSubmit={handleUpdateUserSubmit} className="flex-1 overflow-y-auto min-h-0 py-2 space-y-3.5">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Full Name * <span className="text-slate-400 font-normal">(Letters only)</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={editingUser.fullName}
-                  onChange={(e) => setEditingUser({ ...editingUser, fullName: e.target.value })}
-                  className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 outline-none focus:border-blue-600"
+                  onChange={(e) => setEditingUser({ ...editingUser, fullName: sanitizeNameInput(e.target.value) })}
+                  className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 outline-none focus:border-blue-600 font-medium"
                 />
               </div>
 
@@ -2949,13 +3054,15 @@ export default function AdminDashboardPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Phone Number <span className="text-slate-400 font-normal">(Ethiopian 09 / 07... numbers only)</span>
+                </label>
                 <input
                   type="tel"
                   value={editingUser.phone || ''}
-                  onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
+                  onChange={(e) => setEditingUser({ ...editingUser, phone: sanitizePhoneInput(e.target.value) })}
                   placeholder="e.g. 0911223344"
-                  className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 outline-none focus:border-blue-600"
+                  className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 outline-none focus:border-blue-600 font-mono"
                 />
               </div>
 
@@ -3122,14 +3229,16 @@ export default function AdminDashboardPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number *</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Phone Number * <span className="text-slate-400 font-normal">(Ethiopian 09 / 07...)</span>
+                    </label>
                     <input
                       type="tel"
                       required
-                      placeholder="+1-555-8888"
+                      placeholder="0911223344"
                       value={newClinicPhone}
-                      onChange={(e) => setNewClinicPhone(e.target.value)}
-                      className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 bg-white outline-none focus:border-purple-600"
+                      onChange={(e) => setNewClinicPhone(sanitizePhoneInput(e.target.value))}
+                      className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 bg-white outline-none focus:border-purple-600 font-mono"
                     />
                   </div>
                 </div>
@@ -3154,13 +3263,15 @@ export default function AdminDashboardPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Admin Full Name *</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Admin Full Name * <span className="text-slate-400 font-normal">(Letters only)</span>
+                    </label>
                     <input
                       type="text"
                       required
                       placeholder="Dr. Admin Name"
                       value={newAdminName}
-                      onChange={(e) => setNewAdminName(e.target.value)}
+                      onChange={(e) => setNewAdminName(sanitizeNameInput(e.target.value))}
                       className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 bg-white outline-none focus:border-purple-600"
                     />
                   </div>

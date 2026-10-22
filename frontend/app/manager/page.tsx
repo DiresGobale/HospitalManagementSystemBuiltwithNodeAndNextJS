@@ -6,6 +6,12 @@ import { useAuth } from '../../lib/auth-context';
 import { DashboardLayout } from '../../components/DashboardLayout';
 import { apiFetch } from '../../lib/api';
 import {
+  sanitizeNameInput,
+  sanitizePhoneInput,
+  validatePersonName,
+  validateEthiopianPhone,
+} from '../../lib/validation';
+import {
   Users,
   Calendar,
   Activity,
@@ -116,11 +122,24 @@ export default function ManagerDashboardPage() {
   const handleUpdatePatient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPatient) return;
+
+    const nameVal = validatePersonName(editingPatient.fullName || '');
+    if (!nameVal.valid) {
+      alert(nameVal.error || 'Invalid patient name. Letters only.');
+      return;
+    }
+    const phoneVal = validateEthiopianPhone(editingPatient.phone || '');
+    if (!phoneVal.valid) {
+      alert(phoneVal.error || 'Invalid phone. Must be a valid Ethiopian phone number (09... or 07...).');
+      return;
+    }
+
     const res = await apiFetch(`/patients/${editingPatient.id}`, {
       method: 'PATCH',
+      clinicId: activeMembership?.clinicId,
       body: JSON.stringify({
-        fullName: editingPatient.fullName,
-        phone: editingPatient.phone,
+        fullName: editingPatient.fullName.trim(),
+        phone: phoneVal.normalizedPhone || editingPatient.phone.trim(),
         email: editingPatient.email,
       }),
     });
@@ -184,12 +203,25 @@ export default function ManagerDashboardPage() {
 
   const handleCreateDoctor = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const nameVal = validatePersonName(newDoctor.fullName);
+    if (!nameVal.valid) {
+      alert(nameVal.error || 'Invalid doctor name. Letters only.');
+      return;
+    }
+    const phoneVal = validateEthiopianPhone(newDoctor.phone);
+    if (!phoneVal.valid) {
+      alert(phoneVal.error || 'Invalid doctor phone. Must be a valid Ethiopian phone number (09... or 07...).');
+      return;
+    }
+
     const res = await apiFetch('/doctors', {
       method: 'POST',
+      clinicId: activeMembership?.clinicId,
       body: JSON.stringify({
-        fullName: newDoctor.fullName,
-        email: newDoctor.email,
-        phone: newDoctor.phone,
+        fullName: newDoctor.fullName.trim(),
+        email: newDoctor.email.trim(),
+        phone: phoneVal.normalizedPhone || newDoctor.phone.trim(),
         specialty: newDoctor.specialty,
         licenseNumber: newDoctor.licenseNumber || 'MD-' + Math.floor(10000 + Math.random() * 90000),
         branchId: branches[0]?.id,
@@ -208,11 +240,24 @@ export default function ManagerDashboardPage() {
   const handleUpdateDoctor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingDoctor) return;
+
+    const nameVal = validatePersonName(editingDoctor.fullName || '');
+    if (!nameVal.valid) {
+      alert(nameVal.error || 'Invalid doctor name. Letters only.');
+      return;
+    }
+    const phoneVal = validateEthiopianPhone(editingDoctor.phone || '');
+    if (!phoneVal.valid) {
+      alert(phoneVal.error || 'Invalid doctor phone. Must be a valid Ethiopian phone number (09... or 07...).');
+      return;
+    }
+
     const res = await apiFetch(`/doctors/${editingDoctor.id}`, {
       method: 'PATCH',
+      clinicId: activeMembership?.clinicId,
       body: JSON.stringify({
-        fullName: editingDoctor.fullName,
-        phone: editingDoctor.phone,
+        fullName: editingDoctor.fullName.trim(),
+        phone: phoneVal.normalizedPhone || editingDoctor.phone.trim(),
         specialty: editingDoctor.specialty,
         licenseNumber: editingDoctor.licenseNumber,
       }),
@@ -273,13 +318,26 @@ export default function ManagerDashboardPage() {
 
   const handleCreatePatient = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const nameVal = validatePersonName(newPtName);
+    if (!nameVal.valid) {
+      setPtMsg(nameVal.error || 'Invalid patient name. Letters only.');
+      return;
+    }
+    const phoneVal = validateEthiopianPhone(newPtPhone);
+    if (!phoneVal.valid) {
+      setPtMsg(phoneVal.error || 'Invalid phone. Must be a valid Ethiopian phone number (09... or 07...).');
+      return;
+    }
+
     setIsSavingPt(true);
     setPtMsg('');
     const res = await apiFetch('/patients', {
       method: 'POST',
+      clinicId: activeMembership?.clinicId,
       body: JSON.stringify({
-        fullName: newPtName,
-        phone: newPtPhone,
+        fullName: newPtName.trim(),
+        phone: phoneVal.normalizedPhone || newPtPhone.trim(),
         email: newPtEmail || null,
       }),
     });
@@ -704,26 +762,30 @@ export default function ManagerDashboardPage() {
 
             <form onSubmit={handleCreatePatient} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Full Name <span className="text-slate-400 font-normal">(Letters only)</span>
+                </label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Alice Cooper"
                   value={newPtName}
-                  onChange={(e) => setNewPtName(e.target.value)}
+                  onChange={(e) => setNewPtName(sanitizeNameInput(e.target.value))}
                   className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-indigo-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Phone Number <span className="text-slate-400 font-normal">(Ethiopian 09 / 07... numbers only)</span>
+                </label>
                 <input
                   type="tel"
                   required
-                  placeholder="+1-555-0188"
+                  placeholder="0911223344"
                   value={newPtPhone}
-                  onChange={(e) => setNewPtPhone(e.target.value)}
-                  className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-indigo-500"
+                  onChange={(e) => setNewPtPhone(sanitizePhoneInput(e.target.value))}
+                  className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-indigo-500 font-mono"
                 />
               </div>
 
@@ -981,23 +1043,28 @@ export default function ManagerDashboardPage() {
             </div>
             <form onSubmit={handleUpdatePatient} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Full Name <span className="text-slate-400 font-normal">(Letters only)</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={editingPatient.fullName}
-                  onChange={(e) => setEditingPatient({ ...editingPatient, fullName: e.target.value })}
-                  className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-indigo-500"
+                  onChange={(e) => setEditingPatient({ ...editingPatient, fullName: sanitizeNameInput(e.target.value) })}
+                  className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-indigo-500 font-medium"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Phone</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Phone <span className="text-slate-400 font-normal">(Ethiopian 09 / 07... numbers only)</span>
+                </label>
                 <input
                   type="tel"
                   required
+                  placeholder="0911223344"
                   value={editingPatient.phone}
-                  onChange={(e) => setEditingPatient({ ...editingPatient, phone: e.target.value })}
-                  className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-indigo-500"
+                  onChange={(e) => setEditingPatient({ ...editingPatient, phone: sanitizePhoneInput(e.target.value) })}
+                  className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-indigo-500 font-mono"
                 />
               </div>
               <div>
@@ -1039,13 +1106,15 @@ export default function ManagerDashboardPage() {
             </div>
             <form onSubmit={handleCreateDoctor} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Full Name <span className="text-slate-400 font-normal">(Letters only)</span>
+                </label>
                 <input
                   type="text"
                   required
                   placeholder="Dr. Gregory House"
                   value={newDoctor.fullName}
-                  onChange={(e) => setNewDoctor({ ...newDoctor, fullName: e.target.value })}
+                  onChange={(e) => setNewDoctor({ ...newDoctor, fullName: sanitizeNameInput(e.target.value) })}
                   className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-indigo-500"
                 />
               </div>
@@ -1062,14 +1131,16 @@ export default function ManagerDashboardPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Phone</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Phone <span className="text-slate-400 font-normal">(Ethiopian 09 / 07... numbers only)</span>
+                  </label>
                   <input
                     type="tel"
                     required
-                    placeholder="+1-555-0102"
+                    placeholder="0911223344"
                     value={newDoctor.phone}
-                    onChange={(e) => setNewDoctor({ ...newDoctor, phone: e.target.value })}
-                    className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-indigo-500"
+                    onChange={(e) => setNewDoctor({ ...newDoctor, phone: sanitizePhoneInput(e.target.value) })}
+                    className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-indigo-500 font-mono"
                   />
                 </div>
                 <div>
@@ -1124,24 +1195,29 @@ export default function ManagerDashboardPage() {
             </div>
             <form onSubmit={handleUpdateDoctor} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Full Name <span className="text-slate-400 font-normal">(Letters only)</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={editingDoctor.fullName}
-                  onChange={(e) => setEditingDoctor({ ...editingDoctor, fullName: e.target.value })}
-                  className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-indigo-500"
+                  onChange={(e) => setEditingDoctor({ ...editingDoctor, fullName: sanitizeNameInput(e.target.value) })}
+                  className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-indigo-500 font-medium"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Phone</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Phone <span className="text-slate-400 font-normal">(Ethiopian 09 / 07... numbers only)</span>
+                  </label>
                   <input
                     type="tel"
                     required
+                    placeholder="0911223344"
                     value={editingDoctor.phone}
-                    onChange={(e) => setEditingDoctor({ ...editingDoctor, phone: e.target.value })}
-                    className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-indigo-500"
+                    onChange={(e) => setEditingDoctor({ ...editingDoctor, phone: sanitizePhoneInput(e.target.value) })}
+                    className="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-indigo-500 font-mono"
                   />
                 </div>
                 <div>
