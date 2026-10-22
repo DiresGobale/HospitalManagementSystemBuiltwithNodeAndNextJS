@@ -1,9 +1,9 @@
-# Implementation Status - Multi-Tenant Clinic SaaS
+# Implementation Status - Multi-Tenant hospital managment system SaaS
 
 ## 1. Project Overview
 
 - **Monorepo**: Workspaces configured for `@caqms/shared`, `@caqms/database`, `@caqms/api`, and `@caqms/web`.
-- **Tenant Boundary**: Mandatory `clinic_id` on all clinic-owned models, queries, WebSocket rooms, and reports.
+- **Tenant Boundary**: Mandatory `clinic_id` on all HMS-owned models, queries, WebSocket rooms, and reports.
 - **Five Primary Roles**: `ADMIN`, `MANAGER`, `DOCTOR`, `PATIENT`, `RECEPTIONIST`.
 
 ---

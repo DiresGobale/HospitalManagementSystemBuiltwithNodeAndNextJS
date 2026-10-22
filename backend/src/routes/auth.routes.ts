@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { AuthService } from '../services/auth.service.js';
 import { validateBody } from '../middleware/validate.js';
 import { requireAuthenticatedUser } from '../middleware/auth.js';
-import { resolveClinicContext } from '../middleware/tenant.js';
+import { resolveHmsContext } from '../middleware/tenant.js';
 import { requireRole } from '../middleware/rbac.js';
 import { loginSchema, registerPatientSchema, inviteStaffSchema, acceptInviteSchema, refreshTokenSchema, forgotPasswordVerifyEmailSchema, forgotPasswordResetSchema, ROLES } from '../types/index.js';
 
@@ -74,7 +74,7 @@ authRouter.get('/me', requireAuthenticatedUser, async (req, res, next) => {
 authRouter.post(
   '/invite',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.ADMIN),
   validateBody(inviteStaffSchema),
   async (req, res, next) => {

@@ -141,10 +141,17 @@ export default function SignUpPage() {
     setIsLoading(false);
 
     if (res.success) {
-      setSuccessMsg('Account registered successfully! Directing you to your Patient Portal...');
+      // Clear any auto-login session so patient logs in deliberately per required workflow
+      try {
+        localStorage.removeItem('caqms_access_token');
+        localStorage.removeItem('caqms_refresh_token');
+        localStorage.removeItem('caqms_active_clinic_id');
+      } catch (e) {}
+
+      setSuccessMsg('Patient account registered successfully! Redirecting to login page...');
       setTimeout(() => {
-        router.push('/patient');
-      }, 900);
+        router.push(`/login?registered=true&email=${encodeURIComponent(email.trim())}`);
+      }, 1000);
     } else {
       setErrorMsg(res.error || 'Failed to create patient account. This email may already be registered.');
     }

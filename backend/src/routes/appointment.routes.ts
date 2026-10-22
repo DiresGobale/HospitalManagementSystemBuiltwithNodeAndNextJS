@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { AppointmentService } from '../services/appointment.service.js';
 import { requireAuthenticatedUser } from '../middleware/auth.js';
-import { resolveClinicContext } from '../middleware/tenant.js';
+import { resolveHmsContext } from '../middleware/tenant.js';
 import { requireRole } from '../middleware/rbac.js';
 import { validateBody, validateQuery } from '../middleware/validate.js';
 import { prisma } from '../config/prisma.js';
@@ -19,7 +19,7 @@ import {
 
 export const appointmentRouter = Router();
 
-appointmentRouter.use(requireAuthenticatedUser, resolveClinicContext);
+appointmentRouter.use(requireAuthenticatedUser, resolveHmsContext);
 
 appointmentRouter.get('/', validateQuery(searchAppointmentsQuerySchema), async (req, res, next) => {
   try {

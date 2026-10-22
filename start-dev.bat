@@ -1,6 +1,6 @@
 @echo off
 echo =======================================================
-echo   Starting CAQMS SaaS (Backend API + Frontend Next.js)
+echo   Starting hospital managment system SaaS (Backend API + Frontend Next.js)
 echo =======================================================
 echo.
 echo - Frontend URL: http://localhost:3000

@@ -41,6 +41,7 @@ import {
   Copy,
   CreditCard,
   Wallet,
+  Bell,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ClinicalJourneyTimeline } from '../../components/ClinicalJourneyTimeline';
@@ -845,6 +846,41 @@ export default function ReceptionistDashboardPage() {
         },
       ]}
     >
+      {/* Real-time Reception Alert for Pending Patient Bookings with Confirmed Payments */}
+      {pendingApprovals.length > 0 && (
+        <div className="mb-6 p-4 rounded-3xl bg-gradient-to-r from-amber-500 via-amber-600 to-orange-500 text-white shadow-lg border border-amber-300 flex flex-col md:flex-row items-center justify-between gap-4 animate-fade-in">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white shrink-0 shadow-inner">
+              <Bell className="w-5 h-5 animate-bounce" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-white text-amber-900 text-[10px] font-black uppercase tracking-wider shadow-xs">
+                  🔔 New Patient Notification
+                </span>
+                <span className="text-xs font-bold text-amber-100">
+                  {pendingApprovals.length} Patient Booking{pendingApprovals.length > 1 ? 's' : ''} Awaiting Approval
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-white mt-1">
+                Latest: <strong>{pendingApprovals[0]?.patient?.fullName}</strong> (Card / {pendingApprovals[0]?.payment?.method || 'CARD'} Payment Confirmed • {pendingApprovals[0]?.service?.name})
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 shrink-0">
+            <button
+              onClick={() => {
+                setActiveTab('approvals');
+                handleOpenApproveModal(pendingApprovals[0]);
+              }}
+              className="px-4 py-2.5 bg-white hover:bg-amber-50 text-amber-900 rounded-xl text-xs font-black transition shadow-md hover:scale-105 active:scale-95"
+            >
+              Approve & Assign Room →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Global Toast Notification */}
       {actionFeedback && (
         <div

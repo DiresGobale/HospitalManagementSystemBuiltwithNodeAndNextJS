@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { QueueService } from '../services/queue.service.js';
 import { requireAuthenticatedUser } from '../middleware/auth.js';
-import { resolveClinicContext } from '../middleware/tenant.js';
+import { resolveHmsContext } from '../middleware/tenant.js';
 import { requireRole } from '../middleware/rbac.js';
 import { validateBody } from '../middleware/validate.js';
 import { prisma, QueueStatus } from '../config/prisma.js';
@@ -71,7 +71,7 @@ queueRouter.get('/public-board/:clinicSlug', async (req, res, next) => {
   }
 });
 
-queueRouter.use(requireAuthenticatedUser, resolveClinicContext);
+queueRouter.use(requireAuthenticatedUser, resolveHmsContext);
 
 queueRouter.get('/sessions', async (req, res, next) => {
   try {

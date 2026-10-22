@@ -355,12 +355,18 @@ export default function PatientPortalPage() {
   // Handle Booking Appointment with Real Payment Details
   const handleBookAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!paymentTxnRef.trim()) {
-      setBookingMsg({
-        type: 'error',
-        text: `Please enter the ${paymentMethod === 'TELEBIRR' ? 'Telebirr Transaction Code' : 'CBE Reference / Transaction ID'} before confirming your booking.`,
-      });
-      return;
+    let txnCode = paymentTxnRef.trim();
+    if (!txnCode) {
+      if (paymentMethod === 'CARD') {
+        txnCode = `CARD-REC-${Math.floor(100000 + Math.random() * 900000)}`;
+        setPaymentTxnRef(txnCode);
+      } else {
+        setBookingMsg({
+          type: 'error',
+          text: `Please enter the ${paymentMethod === 'TELEBIRR' ? 'Telebirr Transaction Code' : 'CBE Reference / Transaction ID'} before confirming your booking.`,
+        });
+        return;
+      }
     }
 
     setIsBooking(true);
@@ -1581,14 +1587,31 @@ export default function PatientPortalPage() {
               {/* Payment Verification Form Fields */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                    {paymentMethod === 'TELEBIRR' ? 'Telebirr Transaction Code / ID' : 'CBE Transaction Reference / ID'} *
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-800">
+                      {paymentMethod === 'CARD'
+                        ? 'Hospital Card Reference / Slip Number *'
+                        : paymentMethod === 'TELEBIRR'
+                        ? 'Telebirr Transaction Code / ID *'
+                        : 'CBE Transaction Reference / ID *'}
+                    </label>
+                    {paymentMethod === 'CARD' && (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentTxnRef(`CARD-REC-${Math.floor(100000 + Math.random() * 900000)}`)}
+                        className="text-[11px] font-bold text-blue-600 hover:text-blue-800 underline"
+                      >
+                        Auto-fill Card Reference
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
                     required
                     placeholder={
-                      paymentMethod === 'TELEBIRR'
+                      paymentMethod === 'CARD'
+                        ? 'e.g. CARD-REC-892104 or POS-TXN-492104'
+                        : paymentMethod === 'TELEBIRR'
                         ? 'e.g. TB99577486612 or 8K91029384'
                         : 'e.g. FT242940283 or CBE-1000305532472'
                     }
@@ -1597,7 +1620,9 @@ export default function PatientPortalPage() {
                     className="w-full text-xs font-mono font-bold border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
                   />
                   <span className="text-[11px] text-slate-400 mt-1 block">
-                    Required for front-desk reception to verify and confirm your appointment.
+                    {paymentMethod === 'CARD'
+                      ? 'Initial registration card payment will be verified at front desk reception upon arrival.'
+                      : 'Required for front-desk reception to verify and confirm your appointment.'}
                   </span>
                 </div>
 

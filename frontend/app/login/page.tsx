@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth, getRoleDashboardPath } from '../../lib/auth-context';
 import { Navbar } from '../../components/Navbar';
 import {
@@ -20,12 +20,17 @@ import {
   ChevronDown,
   ChevronUp,
   Check,
+  CheckCircle2,
   UserPlus,
 } from 'lucide-react';
 
-export default function LoginPage() {
+function LoginFormContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, activeMembership, login } = useAuth();
+
+  const isNewlyRegistered = searchParams.get('registered') === 'true';
+  const initialEmail = searchParams.get('email') || '';
 
   // Password visibility
   const [showPassword, setShowPassword] = useState(false);
@@ -34,11 +39,22 @@ export default function LoginPage() {
   const [showDemoAccounts, setShowDemoAccounts] = useState(false);
 
   // Login form state
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successNotice, setSuccessNotice] = useState(
+    isNewlyRegistered
+      ? 'Patient account registered successfully! Please enter your email & password to access your dashboard.'
+      : ''
+  );
+
+  useEffect(() => {
+    if (initialEmail && !email) {
+      setEmail(initialEmail);
+    }
+  }, [initialEmail]);
 
   // If already authenticated, redirect to respective role dashboard
   useEffect(() => {
@@ -99,75 +115,53 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs font-semibold">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Next-Generation Healthcare Portal</span>
-                </div>
-
-                <h2 className="text-3xl xl:text-4xl font-extrabold tracking-tight text-white leading-tight">
-                  Seamless Access.<br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-300">
-                    Zero Waiting Rooms.
-                  </span>
-                </h2>
-
-                <p className="text-sm text-slate-300 leading-relaxed max-w-md">
-                  Experience modern hospital care. Patients can schedule appointments, consult doctors, complete diagnostic X-Rays, purchase prescribed medications, and track waiting lines remotely.
-                </p>
+              <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-semibold mb-6">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Enterprise Clinical Portal</span>
               </div>
 
-              {/* Enterprise Feature Highlights */}
-              <div className="mt-8 space-y-3.5">
-                <div className="flex items-start space-x-3 text-xs text-slate-200">
-                  <div className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400 mt-0.5">
-                    <Check className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <strong className="text-white block font-semibold">Remote Online Self-Registration</strong>
-                    <span className="text-slate-400">Create an official patient record instantly without physical check-in.</span>
-                  </div>
-                </div>
+              <h2 className="text-2xl xl:text-3xl font-black tracking-tight leading-snug mb-4">
+                Secure access for hospital staff & verified patients.
+              </h2>
+              <p className="text-slate-300 text-xs xl:text-sm leading-relaxed max-w-md">
+                Streamline outpatient registration, room allocations, diagnostic imaging, and multi-departmental patient consultations in one integrated platform.
+              </p>
+            </div>
 
-                <div className="flex items-start space-x-3 text-xs text-slate-200">
-                  <div className="p-1 rounded-lg bg-blue-500/20 text-blue-400 mt-0.5">
-                    <Clock className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <strong className="text-white block font-semibold">Live Tele-Queue & Position Tracker</strong>
-                    <span className="text-slate-400">View real-time waiting line positions and estimated consultation countdowns.</span>
-                  </div>
+            {/* Middle Feature Highlights */}
+            <div className="relative z-10 space-y-3.5 my-8">
+              <div className="flex items-center space-x-3 bg-white/5 border border-white/10 rounded-2xl p-3.5 backdrop-blur-sm">
+                <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400 shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
                 </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white">Role-Based Access Control</h4>
+                  <p className="text-[11px] text-slate-400">
+                    Dedicated portals for Super Admin, Admin, Doctor, Nursing, Laboratory & Pharmacy.
+                  </p>
+                </div>
+              </div>
 
-                <div className="flex items-start space-x-3 text-xs text-slate-200">
-                  <div className="p-1 rounded-lg bg-purple-500/20 text-purple-400 mt-0.5">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <strong className="text-white block font-semibold">Row-Level Tenant Security</strong>
-                    <span className="text-slate-400">HIPAA & GDPR privacy standards with encrypted medical records.</span>
-                  </div>
+              <div className="flex items-center space-x-3 bg-white/5 border border-white/10 rounded-2xl p-3.5 backdrop-blur-sm">
+                <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white">Hospital Timeline Tracking</h4>
+                  <p className="text-[11px] text-slate-400">
+                    Real-time room-to-room journey: Card Reception → Doctor → Specialist/Lab → Central Pharmacy.
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* Bottom Trust & Compliance Footer */}
-            <div className="relative z-10 pt-8 border-t border-slate-800">
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="p-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
-                  <span className="text-xl font-black text-white block">99.99%</span>
-                  <span className="text-[11px] text-slate-400">System Availability</span>
-                </div>
-                <div className="p-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
-                  <span className="text-xl font-black text-white block">50K+</span>
-                  <span className="text-[11px] text-slate-400">Consultations Handled</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-[11px] text-slate-400">
-                <span>🔒 256-bit SSL Data Encryption</span>
-                <span>• ISO 27001 Certified</span>
-              </div>
+            {/* Bottom Footer Note */}
+            <div className="relative z-10 pt-6 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+              <span>© {new Date().getFullYear()} HMS Hospital Systems</span>
+              <span className="flex items-center space-x-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block mr-1"></span>
+                <span>Active 24/7 Care</span>
+              </span>
             </div>
           </div>
 
@@ -188,6 +182,17 @@ export default function LoginPage() {
                   Enter your credentials to access your hospital management dashboard or patient portal.
                 </p>
               </div>
+
+              {/* Registration Success Banner */}
+              {successNotice && (
+                <div className="mb-6 p-4 rounded-xl text-xs bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-start gap-3 shadow-sm animate-fade-in">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="font-bold block">Registration Completed</strong>
+                    <span>{successNotice}</span>
+                  </div>
+                </div>
+              )}
 
               {errorMsg && (
                 <div className="mb-6 p-4 rounded-xl text-xs bg-rose-50 border border-rose-200 text-rose-800 flex items-start gap-3 animate-fadeIn">
@@ -250,101 +255,106 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-xs pt-1">
-                  <label className="flex items-center space-x-2 cursor-pointer text-slate-600">
+                <div className="flex items-center justify-between pt-1">
+                  <label className="flex items-center space-x-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
                     />
-                    <span>Remember this device for 30 days</span>
+                    <span className="text-xs text-slate-600">Remember this device</span>
                   </label>
                 </div>
 
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-60 text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-sm hover:shadow flex items-center justify-center space-x-2 mt-2"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl text-xs sm:text-sm transition duration-200 flex items-center justify-center space-x-2 shadow-lg shadow-blue-600/20 disabled:opacity-50 mt-2"
                 >
                   {isLoading ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Authenticating Securely...</span>
-                    </div>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <>
-                      <span>Sign In to Healthcare Portal</span>
-                      <ArrowRight className="h-4 w-4" />
+                      <span>Sign In to Dashboard</span>
+                      <ArrowRight className="w-4 h-4" />
                     </>
                   )}
                 </button>
               </form>
 
-              {/* Dedicated "Create New Account" Section at the bottom */}
-              <div className="mt-8 pt-6 border-t border-slate-200">
-                <div className="text-center space-y-3">
-                  <p className="text-xs text-slate-500">
-                    Don&apos;t have an account yet?
-                  </p>
+              {/* Patient Sign Up Redirect */}
+              <div className="mt-6 pt-6 border-t border-slate-100 text-center">
+                <p className="text-xs text-slate-500">
+                  New patient visiting for the first time?{' '}
                   <Link
                     href="/signup"
-                    className="w-full inline-flex items-center justify-center space-x-2 py-3 px-4 rounded-xl border-2 border-blue-600 text-blue-600 hover:bg-blue-50 hover:border-blue-700 font-bold text-xs sm:text-sm transition-all duration-200 group"
+                    className="font-bold text-blue-600 hover:text-blue-800 transition inline-flex items-center space-x-1"
                   >
-                    <UserPlus className="w-4 h-4 text-blue-600 group-hover:scale-110 transition-transform" />
-                    <span>Create New Account</span>
+                    <span>Create Patient Account</span>
+                    <ArrowRight className="w-3 h-3" />
                   </Link>
-                  <p className="text-[11px] text-slate-400">
-                    Exclusive online self-registration for patients • Remote queue tracking
-                  </p>
-                </div>
+                </p>
               </div>
 
-              {/* Fast Testing & Persona Drawer Accordion */}
-              <div className="mt-8 pt-5 border-t border-slate-100">
+              {/* Quick Demo Credentials Drawer */}
+              <div className="mt-6 border border-slate-200 rounded-2xl overflow-hidden bg-slate-50/50">
                 <button
                   type="button"
                   onClick={() => setShowDemoAccounts(!showDemoAccounts)}
-                  className="w-full flex items-center justify-between text-xs font-semibold text-slate-600 hover:text-slate-900 py-1"
+                  className="w-full px-4 py-3 text-left flex items-center justify-between text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
                 >
                   <div className="flex items-center space-x-2">
                     <KeyRound className="w-3.5 h-3.5 text-blue-600" />
-                    <span>System Evaluation & Testing Personas</span>
+                    <span>Quick Demo Credentials (Click to Auto-fill)</span>
                   </div>
-                  {showDemoAccounts ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                  {showDemoAccounts ? (
+                    <ChevronUp className="w-4 h-4 text-slate-400" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                  )}
                 </button>
 
                 {showDemoAccounts && (
-                  <div className="mt-3 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-2 animate-fadeIn">
-                    <p className="text-[11px] text-slate-500">
-                      Click any role below to pre-populate credentials (password: <code className="font-mono bg-white px-1 py-0.5 rounded border">Password123!</code>):
+                  <div className="p-3 border-t border-slate-200 bg-white space-y-2">
+                    <p className="text-[11px] text-slate-500 px-1">
+                      Password for all demo accounts is <code className="bg-slate-100 px-1 py-0.5 rounded text-blue-600 font-mono font-bold">Password123!</code>
                     </p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => quickFill('superadmin@metrohealth.com')}
+                        className="p-2.5 bg-white hover:bg-rose-50 hover:border-rose-300 border border-slate-200 rounded-xl text-left transition"
+                      >
+                        <span className="font-bold text-rose-900 block text-[11px]">👑 Super Admin</span>
+                        <span className="text-[10px] text-slate-400 block truncate">superadmin@metrohealth.com</span>
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => quickFill('admin@metrohealth.com')}
                         className="p-2.5 bg-white hover:bg-purple-50 hover:border-purple-300 border border-slate-200 rounded-xl text-left transition"
                       >
-                        <span className="font-bold text-purple-900 block text-[11px]">👑 Super Admin</span>
+                        <span className="font-bold text-purple-900 block text-[11px]">⚙️ Admin</span>
                         <span className="text-[10px] text-slate-400 block truncate">admin@metrohealth.com</span>
                       </button>
 
                       <button
                         type="button"
-                        onClick={() => quickFill('manager@metrohealth.com')}
-                        className="p-2.5 bg-white hover:bg-indigo-50 hover:border-indigo-300 border border-slate-200 rounded-xl text-left transition"
+                        onClick={() => quickFill('doctor.sarah@metrohealth.com')}
+                        className="p-2.5 bg-white hover:bg-blue-50 hover:border-blue-300 border border-slate-200 rounded-xl text-left transition"
                       >
-                        <span className="font-bold text-indigo-900 block text-[11px]">🛡️ Admin</span>
-                        <span className="text-[10px] text-slate-400 block truncate">manager@metrohealth.com</span>
+                        <span className="font-bold text-blue-900 block text-[11px]">🩺 Doctor</span>
+                        <span className="text-[10px] text-slate-400 block truncate">doctor.sarah@metrohealth.com</span>
                       </button>
 
                       <button
                         type="button"
-                        onClick={() => quickFill('doctor@metrohealth.com')}
-                        className="p-2.5 bg-white hover:bg-emerald-50 hover:border-emerald-300 border border-slate-200 rounded-xl text-left transition"
+                        onClick={() => quickFill('specialist.drjohn@metrohealth.com')}
+                        className="p-2.5 bg-white hover:bg-cyan-50 hover:border-cyan-300 border border-slate-200 rounded-xl text-left transition"
                       >
-                        <span className="font-bold text-emerald-900 block text-[11px]">🩺 Doctor</span>
-                        <span className="text-[10px] text-slate-400 block truncate">doctor@metrohealth.com</span>
+                        <span className="font-bold text-cyan-900 block text-[11px]">🔬 Specialist</span>
+                        <span className="text-[10px] text-slate-400 block truncate">specialist.drjohn@metrohealth.com</span>
                       </button>
 
                       <button
@@ -399,7 +409,14 @@ export default function LoginPage() {
           </div>
         </div>
       </main>
-
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center text-xs text-slate-500 font-semibold">Loading Hospital Portal...</div>}>
+      <LoginFormContent />
+    </Suspense>
   );
 }

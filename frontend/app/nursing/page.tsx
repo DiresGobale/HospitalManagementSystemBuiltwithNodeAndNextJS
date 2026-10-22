@@ -64,6 +64,7 @@ export default function NursingPage() {
 
   // Selected for Triage Intake Modal
   const [selectedApptForTriage, setSelectedApptForTriage] = useState<any | null>(null);
+  const [triageTargetRoom, setTriageTargetRoom] = useState('Room 102 - Doctor Consultation Suite');
   const [triageForm, setTriageForm] = useState<TriageVitals>({
     systolicBP: '120',
     diastolicBP: '80',
@@ -235,7 +236,7 @@ export default function NursingPage() {
 • Weight: ${triageForm.weight} kg | Height: ${triageForm.height} cm | BMI: ${bmi} (${category})
 • Triage Level: ${triageForm.triageLevel}
 • Triage Assessment: ${triageForm.nursingNotes || 'Patient triaged and vital signs verified.'}
-• Routed to: Room 102 - Doctor Consultation Suite
+• Routed to: ${triageTargetRoom}
 • Triage Nurse: ${user?.fullName || 'Hospital Triage Nurse'}`;
 
       const existingNotes = selectedApptForTriage.internalNotes || '';
@@ -248,7 +249,7 @@ export default function NursingPage() {
       });
 
       if (res.success) {
-        setStatusMsg(`Triage vitals recorded for ${selectedApptForTriage.patient?.fullName || 'Patient'}. Directed to Consultation Room 102.`);
+        setStatusMsg(`Triage vitals recorded for ${selectedApptForTriage.patient?.fullName || 'Patient'}. Directed to ${triageTargetRoom}.`);
         setSelectedApptForTriage(null);
         await fetchNursingData();
       } else {
@@ -941,11 +942,28 @@ export default function NursingPage() {
                   />
                 </div>
 
+                {/* Route Patient Destination Selection */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Route / Assign Patient to Clinical Room
+                  </label>
+                  <select
+                    value={triageTargetRoom}
+                    onChange={(e) => setTriageTargetRoom(e.target.value)}
+                    className="w-full border border-indigo-200 rounded-xl p-2.5 outline-none focus:border-indigo-500 bg-indigo-50/50 font-bold text-indigo-900 text-xs"
+                  >
+                    <option value="Room 102 - Doctor Consultation Suite">Room 102 - Doctor General Consultation Suite</option>
+                    <option value="Room 108 - Pathology & Clinical Laboratory">Room 108 - Pathology & Clinical Laboratory</option>
+                    <option value="Room 204 - Specialist Diagnostic & Imaging Suite">Room 204 - Specialist Diagnostic & Imaging Suite</option>
+                    <option value="Room 106 - Pediatric Consultation Suite">Room 106 - Pediatric Consultation Suite</option>
+                  </select>
+                </div>
+
                 {/* Workflow Sequence Notice */}
                 <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 text-[11px] text-indigo-900 flex items-center space-x-2">
                   <ArrowRight className="w-4 h-4 text-indigo-600 flex-shrink-0" />
                   <span>
-                    Saving vitals marks Room 103 triage complete and directs patient to <strong>Room 102 - Doctor Consultation Suite</strong>.
+                    Saving vitals marks Room 103 triage complete and directs patient to <strong>{triageTargetRoom}</strong>.
                   </span>
                 </div>
               </div>
@@ -965,7 +983,7 @@ export default function NursingPage() {
                   className="px-5 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition shadow-md flex items-center space-x-1.5 active:scale-95"
                 >
                   <Save className="w-4 h-4" />
-                  <span>{isSavingTriage ? 'Saving Vitals...' : 'Save Vitals & Transfer to Room 102'}</span>
+                  <span>{isSavingTriage ? 'Saving Vitals...' : 'Save Vitals & Assign Room'}</span>
                 </button>
               </div>
             </form>

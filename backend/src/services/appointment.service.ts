@@ -9,10 +9,11 @@ import {
   SearchAppointmentsQuery,
 } from '../types/index.js';
 import { ActivityService } from './activity.service.js';
+import { getSocketServer } from '../events/socket.js';
 
 const VALID_APPOINTMENT_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]> = {
-  REQUESTED: [AppointmentStatus.CONFIRMED, AppointmentStatus.CANCELLED],
-  CONFIRMED: [AppointmentStatus.CHECKED_IN, AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW],
+  REQUESTED: [AppointmentStatus.CONFIRMED, AppointmentStatus.IN_QUEUE, AppointmentStatus.CANCELLED],
+  CONFIRMED: [AppointmentStatus.CHECKED_IN, AppointmentStatus.IN_QUEUE, AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW],
   CHECKED_IN: [AppointmentStatus.IN_QUEUE, AppointmentStatus.CANCELLED],
   IN_QUEUE: [AppointmentStatus.IN_PROGRESS, AppointmentStatus.CANCELLED],
   IN_PROGRESS: [AppointmentStatus.COMPLETED, AppointmentStatus.CANCELLED],
@@ -310,14 +311,14 @@ export class AppointmentService {
       throw { statusCode: 404, code: 'APPOINTMENT_NOT_FOUND', message: 'Appointment not found in this hospital.' };
     }
 
-    this.validateTransition(appointment.status, AppointmentStatus.CONFIRMED);
+    this.validateTransition(appointment.status, AppointmentStatus.IN_QUEUE);
 
     const doctorId = input?.doctorId || appointment.doctorId;
     const branchId = input?.branchId || appointment.branchId;
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const { updated, displayToken, ticket, session } = await prisma.$transaction(async (tx) => {
       // Check overlap if doctor changed
-      if (doctorId !== appointment.doctorId) {
+      if (doctorId && doctorId !== appointment.doctorId) {
         const overlapping = await tx.appointment.findFirst({
           where: {
             id: { not: appointment.id },
@@ -348,14 +349,85 @@ export class AppointmentService {
         });
       }
 
+      // Auto-issue queue ticket into live doctor/nurse consultation queue upon approval
+      const todayDateStr = new Date().toISOString().split('T')[0];
+      let queueSession = await tx.queueSession.findFirst({
+        where: {
+          clinicId,
+          doctorId: doctorId || undefined,
+          operatingDate: todayDateStr,
+          status: 'OPEN',
+        },
+      });
+
+      if (!queueSession) {
+        queueSession = await tx.queueSession.findFirst({
+          where: {
+            clinicId,
+            operatingDate: todayDateStr,
+            status: 'OPEN',
+          },
+        });
+      }
+
+      if (!queueSession) {
+        let targetBranchId = branchId;
+        if (!targetBranchId) {
+          const firstBranch = await tx.branch.findFirst({ where: { clinicId } });
+          targetBranchId = firstBranch?.id || '';
+        }
+
+        queueSession = await tx.queueSession.create({
+          data: {
+            clinicId,
+            branchId: targetBranchId,
+            doctorId: doctorId || null,
+            operatingDate: todayDateStr,
+            status: 'OPEN',
+          },
+        });
+      }
+
+      const counter = await tx.queueCounter.upsert({
+        where: { queueSessionId: queueSession.id },
+        update: { currentNumber: { increment: 1 } },
+        create: { clinicId, queueSessionId: queueSession.id, currentNumber: 1 },
+      });
+
+      const tokenNumberStr = counter.currentNumber.toString().padStart(3, '0');
+      const genToken = `T-${tokenNumberStr}`;
+
+      let createdTicket: any = null;
+      const existingTicket = await tx.queueTicket.findFirst({
+        where: { appointmentId: appointment.id },
+      });
+
+      if (!existingTicket) {
+        createdTicket = await tx.queueTicket.create({
+          data: {
+            clinicId,
+            queueSessionId: queueSession.id,
+            patientId: appointment.patientId,
+            appointmentId: appointment.id,
+            tokenNumber: counter.currentNumber,
+            displayToken: genToken,
+            priority: QueuePriority.NORMAL,
+            status: 'WAITING',
+            createdBy: changedBy,
+          },
+        });
+      } else {
+        createdTicket = existingTicket;
+      }
+
       const updated = await tx.appointment.update({
         where: { id: appointment.id },
         data: {
-          status: AppointmentStatus.CONFIRMED,
+          status: AppointmentStatus.IN_QUEUE,
           doctorId,
           branchId,
-          roomNumber: input?.roomNumber !== undefined ? input.roomNumber : appointment.roomNumber,
-          assignedRole: input?.assignedRole !== undefined ? input.assignedRole : appointment.assignedRole,
+          roomNumber: input?.roomNumber !== undefined ? input.roomNumber : (appointment.roomNumber || 'Room 102 - Consultation Suite'),
+          assignedRole: input?.assignedRole !== undefined ? input.assignedRole : (appointment.assignedRole || 'Doctor'),
           internalNotes: input?.notes !== undefined ? input.notes : appointment.internalNotes,
         },
         include: {
@@ -373,14 +445,36 @@ export class AppointmentService {
           clinicId,
           appointmentId: appointment.id,
           fromStatus: appointment.status,
-          toStatus: AppointmentStatus.CONFIRMED,
+          toStatus: AppointmentStatus.IN_QUEUE,
           changedBy,
-          reason: input?.notes || 'Appointment approved & confirmed by reception',
+          reason: input?.notes || `Appointment approved & queued by reception with token ${createdTicket.displayToken}`,
         },
       });
 
-      return updated;
+      return {
+        updated,
+        displayToken: createdTicket.displayToken,
+        ticket: createdTicket,
+        session: queueSession,
+      };
     });
+
+    try {
+      const io = getSocketServer();
+      if (io) {
+        io.to(`clinic:${clinicId}`).emit('queue:ticket-created', {
+          ticketId: ticket.id,
+          tokenNumber: ticket.tokenNumber,
+          displayToken: displayToken,
+          roomNumber: updated.roomNumber,
+          patientId: updated.patientId,
+          appointmentId: updated.id,
+        });
+        io.to(`clinic:${clinicId}`).emit('appointment:approved', updated);
+      }
+    } catch (err) {
+      console.warn('Socket broadcast warning in approveAppointment:', err);
+    }
 
     await ActivityService.log({
       clinicId,
@@ -388,10 +482,11 @@ export class AppointmentService {
       action: 'APPOINTMENT_APPROVED',
       resourceType: 'APPOINTMENT',
       resourceId: updated.id,
-      description: `Reception approved appointment: ${updated.appointmentNumber} - Assigned to ${updated.roomNumber || 'Room 102'}`,
+      description: `Reception approved & queued visit: ${updated.appointmentNumber} (Token: ${displayToken}) - Assigned to ${updated.assignedRole || 'Doctor'} in ${updated.roomNumber || 'Room 102'}`,
       metadata: {
         appointmentNumber: updated.appointmentNumber,
         roomNumber: updated.roomNumber,
+        token: displayToken,
       },
     });
 

@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { ReportsService } from '../services/reports.service.js';
 import { requireAuthenticatedUser } from '../middleware/auth.js';
-import { resolveClinicContext } from '../middleware/tenant.js';
+import { resolveHmsContext } from '../middleware/tenant.js';
 import { requireRole } from '../middleware/rbac.js';
 import { ROLES } from '../types/index.js';
 
 export const reportsRouter = Router();
 
-reportsRouter.use(requireAuthenticatedUser, resolveClinicContext);
+reportsRouter.use(requireAuthenticatedUser, resolveHmsContext);
 
 reportsRouter.get(
   '/overview',

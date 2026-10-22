@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { PharmacyService } from '../services/pharmacy.service.js';
 import { requireAuthenticatedUser } from '../middleware/auth.js';
-import { resolveClinicContext } from '../middleware/tenant.js';
+import { resolveHmsContext } from '../middleware/tenant.js';
 import { requireRole } from '../middleware/rbac.js';
 import { validateBody, validateQuery } from '../middleware/validate.js';
 import {
@@ -16,7 +16,7 @@ import {
 
 export const pharmacyRouter = Router();
 
-pharmacyRouter.use(requireAuthenticatedUser, resolveClinicContext);
+pharmacyRouter.use(requireAuthenticatedUser, resolveHmsContext);
 
 // List available drugs in hospital formulary
 pharmacyRouter.get('/medications', async (req, res, next) => {

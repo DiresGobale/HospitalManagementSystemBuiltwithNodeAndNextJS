@@ -90,6 +90,11 @@ export default function DoctorDashboardPage() {
   const [scanImageUrl, setScanImageUrl] = useState('https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=800&q=80');
   const [isSubmittingFindings, setIsSubmittingFindings] = useState(false);
 
+  // Specialist Modern Clinical Diagnostic & Treatment Tools State
+  const [specialistTool, setSpecialistTool] = useState<'imaging' | 'ecg' | 'analyzer'>('imaging');
+  const [imagingFilter, setImagingFilter] = useState<'normal' | 'contrast' | 'invert'>('normal');
+  const [imagingZoom, setImagingZoom] = useState<number>(1);
+
   // Doctor Review & Final Counseling Modal State (returned from X-Ray)
   const [reviewingOrder, setReviewingOrder] = useState<any>(null);
   const [doctorConclusionText, setDoctorConclusionText] = useState('');
@@ -371,14 +376,25 @@ export default function DoctorDashboardPage() {
 
   const openDocumentFindingsModal = (order: any) => {
     setRecordingOrder(order);
-    setScanFindings(
-      order.findings ||
-        `Anatomical examination of ${order.bodyPart || 'target region'} shows normal osseous structures. No focal radiopaque foreign body, fracture, or joint dislocation identified. Soft tissue planes preserved.`
-    );
-    setScanImpression(
-      order.impression ||
-        `No acute radiographic abnormality of ${order.bodyPart || 'target anatomical region'}. Normal study.`
-    );
+    if (order.type === 'ECG') {
+      setSpecialistTool('ecg');
+      setScanFindings(order.findings || '12-lead Electrocardiogram (ECG): Normal sinus rhythm. Heart rate 72 bpm. PR interval 160ms, QRS duration 88ms, QTc 412ms. Normal axis. No ST-segment elevation or depression, no pathological Q waves.');
+      setScanImpression(order.impression || 'Normal 12-lead ECG study. Normal sinus rhythm without acute ischemic patterns or conduction delays.');
+    } else if (order.type === 'LAB_TEST') {
+      setSpecialistTool('analyzer');
+      setScanFindings(order.findings || 'Pathology & Blood Chemistry Panel:\n• WBC: 6.8 x10^3/uL (Normal: 4.5-11.0)\n• RBC: 4.9 x10^6/uL (Normal: 4.3-5.9)\n• Hemoglobin: 14.5 g/dL (Normal: 13.5-17.5)\n• Platelets: 245 x10^3/uL (Normal: 150-450)\n• Fasting Blood Glucose: 96 mg/dL (Normal: 70-100)\n• Creatinine: 0.9 mg/dL (Normal: 0.7-1.3)');
+      setScanImpression(order.impression || 'Complete blood count and biochemical metabolic panel within physiological normal parameters.');
+    } else {
+      setSpecialistTool('imaging');
+      setScanFindings(
+        order.findings ||
+          `Anatomical examination of ${order.bodyPart || 'target region'} shows normal osseous structures. No focal radiopaque foreign body, fracture, or joint dislocation identified. Soft tissue planes preserved.`
+      );
+      setScanImpression(
+        order.impression ||
+          `No acute radiographic abnormality of ${order.bodyPart || 'target anatomical region'}. Normal study.`
+      );
+    }
     setScanRadiologyNotes(order.radiologyNotes || 'Multi-view digital radiograph acquired with standard exposure parameters.');
     setScanImageUrl(
       order.imageUrl || 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=800&q=80'
@@ -402,7 +418,7 @@ export default function DoctorDashboardPage() {
 
     setIsSubmittingFindings(false);
     if (res.success) {
-      setStatusMsg('Radiology Report finalized! Patient and imaging results returned to attending doctor.');
+      setStatusMsg('Specialist Diagnostic Report finalized! Patient and findings returned to attending doctor for counseling.');
       setRecordingOrder(null);
       loadDoctorData();
       if (selectedSession) loadSessionDetails(selectedSession.id);
@@ -418,13 +434,13 @@ export default function DoctorDashboardPage() {
     setReviewingOrder(order);
     setDoctorConclusionText(
       order.doctorConclusion ||
-        `Patient counseled on X-Ray findings (${order.impression || 'normal findings'}). Prescribed supportive care and oral medication. Advised to rest and schedule follow-up in 2 weeks if symptoms persist.`
+        `Patient counseled on specialist / laboratory findings (${order.impression || 'normal physiological findings'}). Prescribing targeted therapeutic medication. Advised on adequate rest and 2-week outpatient follow-up.`
     );
   };
 
-  const handleSubmitDoctorReview = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reviewingOrder || !doctorConclusionText) return;
+  const handleSubmitDoctorReview = async (e?: React.FormEvent): Promise<any> => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!reviewingOrder || !doctorConclusionText) return null;
     setIsSubmittingReview(true);
 
     const res = await apiFetch(`/diagnostics/${reviewingOrder.id}/review`, {
@@ -437,13 +453,16 @@ export default function DoctorDashboardPage() {
 
     setIsSubmittingReview(false);
     if (res.success) {
-      setStatusMsg(`Patient counseled on X-Ray results and visit successfully completed!`);
+      setStatusMsg(`Patient counseled on diagnostic results and consultation finalized!`);
+      const finishedOrder = reviewingOrder;
       setReviewingOrder(null);
       setDoctorConclusionText('');
       loadDoctorData();
       if (selectedSession) loadSessionDetails(selectedSession.id);
+      return finishedOrder;
     } else {
       alert(`Error completing review: ${res.error?.message}`);
+      return null;
     }
   };
 
@@ -1909,16 +1928,161 @@ export default function DoctorDashboardPage() {
                 />
               </div>
 
-              {scanImageUrl && (
-                <div className="border border-slate-200 rounded-xl p-3 bg-slate-900 text-center">
-                  <span className="text-[10px] text-slate-400 block mb-1">Radiography Preview:</span>
-                  <img
-                    src={scanImageUrl}
-                    alt="Scan preview"
-                    className="max-h-44 mx-auto rounded-lg object-contain"
-                  />
+              {/* Modern Specialist Treatment & Diagnostic Tools */}
+              <div className="border border-purple-200 rounded-2xl bg-slate-900 p-4 text-white space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
+                  <div className="flex items-center space-x-2">
+                    <Sparkles className="w-4 h-4 text-purple-400" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-purple-300">
+                      Modern Clinical Diagnostic & Investigation Tools
+                    </span>
+                  </div>
+
+                  {/* Tool Switcher */}
+                  <div className="flex items-center space-x-1 bg-white/10 p-1 rounded-xl text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setSpecialistTool('imaging')}
+                      className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                        specialistTool === 'imaging' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      DICOM Imaging
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSpecialistTool('ecg')}
+                      className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                        specialistTool === 'ecg' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      ECG Monitor
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSpecialistTool('analyzer')}
+                      className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                        specialistTool === 'analyzer' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      Lab Analyzer
+                    </button>
+                  </div>
                 </div>
-              )}
+
+                {/* TOOL 1: DICOM High-Resolution Imaging */}
+                {specialistTool === 'imaging' && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-[11px] text-slate-300">
+                      <div className="flex items-center space-x-2">
+                        <span>Zoom:</span>
+                        <div className="flex space-x-1">
+                          {[1, 1.5, 2].map((z) => (
+                            <button
+                              key={z}
+                              type="button"
+                              onClick={() => setImagingZoom(z)}
+                              className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                imagingZoom === z ? 'bg-purple-500 text-white' : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                              }`}
+                            >
+                              {z}x
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <span>Contrast:</span>
+                        <div className="flex space-x-1">
+                          {(['normal', 'contrast', 'invert'] as const).map((filter) => (
+                            <button
+                              key={filter}
+                              type="button"
+                              onClick={() => setImagingFilter(filter)}
+                              className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold ${
+                                imagingFilter === filter ? 'bg-purple-500 text-white' : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                              }`}
+                            >
+                              {filter}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="overflow-hidden rounded-xl bg-black border border-white/10 p-2 text-center relative max-h-56 flex items-center justify-center">
+                      <img
+                        src={scanImageUrl}
+                        alt="Radiology preview"
+                        style={{
+                          transform: `scale(${imagingZoom})`,
+                          filter:
+                            imagingFilter === 'contrast'
+                              ? 'contrast(180%) brightness(90%)'
+                              : imagingFilter === 'invert'
+                              ? 'invert(100%)'
+                              : 'none',
+                        }}
+                        className="max-h-52 mx-auto rounded object-contain transition-all duration-200"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* TOOL 2: 12-Lead ECG Waveform Monitor */}
+                {specialistTool === 'ecg' && (
+                  <div className="p-3 bg-black rounded-xl border border-emerald-900 font-mono text-emerald-400 space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-bold flex items-center gap-1.5 text-emerald-300">
+                        <Activity className="w-4 h-4 animate-pulse text-emerald-400" />
+                        Lead II Rhythm Strip • 25mm/s • 10mm/mV
+                      </span>
+                      <span className="bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800 text-[10px] text-emerald-300">
+                        HR: 72 bpm (Normal Sinus)
+                      </span>
+                    </div>
+
+                    {/* SVG ECG Waveform */}
+                    <div className="h-20 w-full overflow-hidden flex items-center justify-center bg-emerald-950/30 rounded border border-emerald-900/40">
+                      <svg viewBox="0 0 500 80" className="w-full h-full stroke-emerald-400 fill-none" strokeWidth="2">
+                        <path d="M 0 40 L 40 40 L 45 42 L 50 36 L 55 40 L 80 40 L 85 45 L 90 10 L 95 65 L 100 40 L 105 40 L 115 32 L 125 40 L 180 40 L 185 42 L 190 36 L 195 40 L 220 40 L 225 45 L 230 10 L 235 65 L 240 40 L 245 40 L 255 32 L 265 40 L 320 40 L 325 42 L 330 36 L 335 40 L 360 40 L 365 45 L 370 10 L 375 65 L 380 40 L 385 40 L 395 32 L 405 40 L 460 40 L 465 42 L 470 36 L 475 40 L 500 40" />
+                      </svg>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-[10px] text-emerald-300/80 pt-1 text-center">
+                      <div>PR: 160 ms (Normal)</div>
+                      <div>QRS: 88 ms (Narrow)</div>
+                      <div>QTc: 412 ms (Normal)</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TOOL 3: Clinical Laboratory Analyzer */}
+                {specialistTool === 'analyzer' && (
+                  <div className="p-3 bg-black/60 rounded-xl border border-white/10 space-y-2 text-xs">
+                    <span className="text-[11px] font-bold text-purple-300 block">Automated Blood Pathology Panel</span>
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div className="bg-white/5 p-2 rounded-lg flex justify-between">
+                        <span className="text-slate-400">WBC:</span>
+                        <strong className="text-emerald-400 font-mono">6.8 k/uL (Normal)</strong>
+                      </div>
+                      <div className="bg-white/5 p-2 rounded-lg flex justify-between">
+                        <span className="text-slate-400">Hgb:</span>
+                        <strong className="text-emerald-400 font-mono">14.5 g/dL (Normal)</strong>
+                      </div>
+                      <div className="bg-white/5 p-2 rounded-lg flex justify-between">
+                        <span className="text-slate-400">Glucose:</span>
+                        <strong className="text-emerald-400 font-mono">96 mg/dL (Normal)</strong>
+                      </div>
+                      <div className="bg-white/5 p-2 rounded-lg flex justify-between">
+                        <span className="text-slate-400">Creatinine:</span>
+                        <strong className="text-emerald-400 font-mono">0.9 mg/dL (Normal)</strong>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
                 <button
@@ -1934,7 +2098,7 @@ export default function DoctorDashboardPage() {
                   className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition shadow-sm flex items-center space-x-1.5"
                 >
                   <CheckCircle className="w-3.5 h-3.5" />
-                  <span>{isSubmittingFindings ? 'Saving...' : 'Finalize & Return to Doctor'}</span>
+                  <span>{isSubmittingFindings ? 'Saving...' : 'Authorize & Return Patient to Doctor'}</span>
                 </button>
               </div>
             </form>
@@ -2042,7 +2206,7 @@ export default function DoctorDashboardPage() {
                 />
               </div>
 
-              <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setReviewingOrder(null)}
@@ -2053,10 +2217,28 @@ export default function DoctorDashboardPage() {
                 <button
                   type="submit"
                   disabled={isSubmittingReview}
-                  className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition shadow-sm flex items-center space-x-1.5"
+                  className="px-4 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-xl transition shadow-sm flex items-center space-x-1.5"
                 >
                   <ShieldCheck className="w-4 h-4" />
-                  <span>{isSubmittingReview ? 'Discharging...' : 'Complete Final Counseling & Discharge'}</span>
+                  <span>{isSubmittingReview ? 'Discharging...' : 'Finalize Counseling & Discharge'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    const savedOrder = await handleSubmitDoctorReview(e);
+                    if (savedOrder) {
+                      openPrescribeModal(
+                        savedOrder.patientId,
+                        savedOrder.patient?.fullName || 'Patient',
+                        savedOrder.appointmentId
+                      );
+                    }
+                  }}
+                  disabled={isSubmittingReview}
+                  className="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition shadow-md hover:scale-105 active:scale-95 flex items-center space-x-1.5"
+                >
+                  <Pill className="w-4 h-4" />
+                  <span>Finalize & Order to Pharmacy (Prescribe Drugs) →</span>
                 </button>
               </div>
             </form>

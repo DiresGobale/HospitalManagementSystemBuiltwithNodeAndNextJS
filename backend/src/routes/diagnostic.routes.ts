@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { DiagnosticService } from '../services/diagnostic.service.js';
 import { requireAuthenticatedUser } from '../middleware/auth.js';
-import { resolveClinicContext } from '../middleware/tenant.js';
+import { resolveHmsContext } from '../middleware/tenant.js';
 import { requireRole } from '../middleware/rbac.js';
 import { validateBody, validateQuery } from '../middleware/validate.js';
 import {
@@ -14,7 +14,7 @@ import {
 
 export const diagnosticRouter = Router();
 
-diagnosticRouter.use(requireAuthenticatedUser, resolveClinicContext);
+diagnosticRouter.use(requireAuthenticatedUser, resolveHmsContext);
 
 // 1. List diagnostic orders
 diagnosticRouter.get(

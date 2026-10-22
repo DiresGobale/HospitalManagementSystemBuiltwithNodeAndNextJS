@@ -71,7 +71,7 @@ export function requirePatientOwnership(req: Request, res: Response, next: NextF
 
   if (
     req.membership.role === ROLES.ADMIN ||
-    req.membership.role === ROLES.MANAGER ||
+    // req.membership.role === ROLES.MANAGER ||
     req.membership.role === ROLES.RECEPTIONIST ||
     req.membership.role === ROLES.DOCTOR ||
     req.membership.role === (ROLES as any).SUPER_ADMIN ||
@@ -98,7 +98,7 @@ export async function requireDoctorAssignment(req: Request, res: Response, next:
   if (!req.membership) {
     return res.status(403).json({
       success: false,
-      error: { code: 'FORBIDDEN', message: 'No clinic membership resolved.' },
+      error: { code: 'FORBIDDEN', message: 'No hospital membership resolved.' },
     });
   }
 

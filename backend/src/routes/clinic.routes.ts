@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { ClinicService } from '../services/clinic.service.js';
 import { ActivityService } from '../services/activity.service.js';
 import { requireAuthenticatedUser } from '../middleware/auth.js';
-import { resolveClinicContext } from '../middleware/tenant.js';
+import { resolveHmsContext} from '../middleware/tenant.js';
 import { requireRole } from '../middleware/rbac.js';
 import { validateBody } from '../middleware/validate.js';
 import { prisma, ClinicStatus } from '../config/prisma.js';
@@ -32,7 +32,7 @@ clinicRouter.post('/', validateBody(createClinicSchema), async (req, res, next) 
   }
 });
 
-clinicRouter.get('/current', requireAuthenticatedUser, resolveClinicContext, async (req, res, next) => {
+clinicRouter.get('/current', requireAuthenticatedUser, resolveHmsContext, async (req, res, next) => {
   try {
     const clinic = await ClinicService.getClinic(req.clinicId!);
     res.json({ success: true, data: clinic });
@@ -44,7 +44,7 @@ clinicRouter.get('/current', requireAuthenticatedUser, resolveClinicContext, asy
 clinicRouter.patch(
   '/current',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.ADMIN),
   validateBody(updateClinicSchema),
   async (req, res, next) => {
@@ -60,7 +60,7 @@ clinicRouter.patch(
 clinicRouter.get(
   '/current/settings',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.ADMIN, ROLES.MANAGER),
   async (req, res, next) => {
     try {
@@ -75,7 +75,7 @@ clinicRouter.get(
 clinicRouter.patch(
   '/current/settings',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.ADMIN),
   validateBody(updateClinicSettingsSchema),
   async (req, res, next) => {
@@ -91,7 +91,7 @@ clinicRouter.patch(
 clinicRouter.get(
   '/current/members',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER),
   async (req, res, next) => {
     try {
@@ -106,7 +106,7 @@ clinicRouter.get(
 clinicRouter.post(
   '/current/users',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER),
   validateBody(createUserSchema),
   async (req, res, next) => {
@@ -122,7 +122,7 @@ clinicRouter.post(
 clinicRouter.post(
   '/current/members',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER),
   validateBody(createUserSchema),
   async (req, res, next) => {
@@ -138,7 +138,7 @@ clinicRouter.post(
 clinicRouter.patch(
   '/current/members/:memberId',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER),
   async (req, res, next) => {
     try {
@@ -164,7 +164,7 @@ clinicRouter.patch(
 clinicRouter.delete(
   '/current/members/:memberId',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER),
   async (req, res, next) => {
     try {
@@ -185,7 +185,7 @@ clinicRouter.delete(
 clinicRouter.get(
   '/current/today-activities',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   async (req, res, next) => {
     try {
       const activities = await ActivityService.getTodayActivities(req.clinicId!);
@@ -200,7 +200,7 @@ clinicRouter.get(
 clinicRouter.post(
   '/current/activities',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   async (req, res, next) => {
     try {
       const activity = await ActivityService.log({
@@ -223,7 +223,7 @@ clinicRouter.post(
 clinicRouter.get(
   '/current/audit-logs',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.ADMIN),
   async (req, res, next) => {
     try {
@@ -242,7 +242,7 @@ clinicRouter.get(
 clinicRouter.get(
   '/current/subscription',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.ADMIN),
   async (req, res, next) => {
     try {
@@ -287,7 +287,7 @@ clinicRouter.get(
 clinicRouter.get(
   '/current/branches',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   async (req, res, next) => {
     try {
       const branches = await ClinicService.listBranches(req.clinicId!);
@@ -301,7 +301,7 @@ clinicRouter.get(
 clinicRouter.post(
   '/current/branches',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.ADMIN, ROLES.MANAGER),
   validateBody(createBranchSchema),
   async (req, res, next) => {
@@ -317,7 +317,7 @@ clinicRouter.post(
 clinicRouter.patch(
   '/current/branches/:branchId',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.ADMIN, ROLES.MANAGER),
   async (req, res, next) => {
     try {
@@ -332,7 +332,7 @@ clinicRouter.patch(
 clinicRouter.delete(
   '/current/branches/:branchId',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.ADMIN),
   async (req, res, next) => {
     try {

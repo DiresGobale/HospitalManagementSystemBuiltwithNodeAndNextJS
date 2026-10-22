@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { DoctorService } from '../services/doctor.service.js';
 import { requireAuthenticatedUser } from '../middleware/auth.js';
-import { resolveClinicContext } from '../middleware/tenant.js';
+import { resolveHmsContext } from '../middleware/tenant.js';
 import { requireRole } from '../middleware/rbac.js';
 import { validateBody, validateQuery } from '../middleware/validate.js';
 import { createDoctorSchema, updateDoctorSchema, createScheduleSchema, createScheduleExceptionSchema, availabilityQuerySchema, ROLES } from '../types/index.js';
@@ -11,7 +11,7 @@ export const doctorRouter = Router();
 doctorRouter.get(
   '/availability',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   validateQuery(availabilityQuerySchema),
   async (req, res, next) => {
     try {
@@ -23,7 +23,7 @@ doctorRouter.get(
   }
 );
 
-doctorRouter.get('/', requireAuthenticatedUser, resolveClinicContext, async (req, res, next) => {
+doctorRouter.get('/', requireAuthenticatedUser, resolveHmsContext, async (req, res, next) => {
   try {
     const branchId = req.query.branchId as string | undefined;
     const doctors = await DoctorService.listDoctors(req.clinicId!, branchId);
@@ -33,7 +33,7 @@ doctorRouter.get('/', requireAuthenticatedUser, resolveClinicContext, async (req
   }
 });
 
-doctorRouter.get('/:doctorId', requireAuthenticatedUser, resolveClinicContext, async (req, res, next) => {
+doctorRouter.get('/:doctorId', requireAuthenticatedUser, resolveHmsContext, async (req, res, next) => {
   try {
     const doctor = await DoctorService.getDoctorById(req.clinicId!, req.params.doctorId);
     res.json({ success: true, data: doctor });
@@ -45,7 +45,7 @@ doctorRouter.get('/:doctorId', requireAuthenticatedUser, resolveClinicContext, a
 doctorRouter.post(
   '/',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.ADMIN, ROLES.MANAGER),
   validateBody(createDoctorSchema),
   async (req, res, next) => {
@@ -61,7 +61,7 @@ doctorRouter.post(
 doctorRouter.patch(
   '/:doctorId',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.ADMIN, ROLES.MANAGER),
   validateBody(updateDoctorSchema),
   async (req, res, next) => {
@@ -77,7 +77,7 @@ doctorRouter.patch(
 doctorRouter.delete(
   '/:doctorId',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.ADMIN, ROLES.MANAGER),
   async (req, res, next) => {
     try {
@@ -92,7 +92,7 @@ doctorRouter.delete(
 doctorRouter.post(
   '/:doctorId/schedules',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.ADMIN, ROLES.MANAGER),
   validateBody(createScheduleSchema),
   async (req, res, next) => {
@@ -108,7 +108,7 @@ doctorRouter.post(
 doctorRouter.post(
   '/:doctorId/exceptions',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.ADMIN, ROLES.MANAGER),
   validateBody(createScheduleExceptionSchema),
   async (req, res, next) => {

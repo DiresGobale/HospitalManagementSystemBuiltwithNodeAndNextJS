@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import { ClinicServiceCatalog } from '../services/service.service.js';
 import { requireAuthenticatedUser } from '../middleware/auth.js';
-import { resolveClinicContext } from '../middleware/tenant.js';
+import { resolveHmsContext } from '../middleware/tenant.js';
 import { requireRole } from '../middleware/rbac.js';
 import { validateBody } from '../middleware/validate.js';
 import { createServiceSchema, updateServiceSchema, ROLES } from '../types/index.js';
 
 export const serviceRouter = Router();
 
-serviceRouter.get('/', requireAuthenticatedUser, resolveClinicContext, async (req, res, next) => {
+serviceRouter.get('/', requireAuthenticatedUser, resolveHmsContext, async (req, res, next) => {
   try {
     const services = await ClinicServiceCatalog.listServices(req.clinicId!);
     res.json({ success: true, data: services });
@@ -17,7 +17,7 @@ serviceRouter.get('/', requireAuthenticatedUser, resolveClinicContext, async (re
   }
 });
 
-serviceRouter.get('/:serviceId', requireAuthenticatedUser, resolveClinicContext, async (req, res, next) => {
+serviceRouter.get('/:serviceId', requireAuthenticatedUser, resolveHmsContext, async (req, res, next) => {
   try {
     const service = await ClinicServiceCatalog.getServiceById(req.clinicId!, req.params.serviceId);
     res.json({ success: true, data: service });
@@ -29,7 +29,7 @@ serviceRouter.get('/:serviceId', requireAuthenticatedUser, resolveClinicContext,
 serviceRouter.post(
   '/',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.ADMIN, ROLES.MANAGER),
   validateBody(createServiceSchema),
   async (req, res, next) => {
@@ -45,7 +45,7 @@ serviceRouter.post(
 serviceRouter.patch(
   '/:serviceId',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.ADMIN, ROLES.MANAGER),
   validateBody(updateServiceSchema),
   async (req, res, next) => {
@@ -61,7 +61,7 @@ serviceRouter.patch(
 serviceRouter.delete(
   '/:serviceId',
   requireAuthenticatedUser,
-  resolveClinicContext,
+  resolveHmsContext,
   requireRole(ROLES.ADMIN, ROLES.MANAGER),
   async (req, res, next) => {
     try {

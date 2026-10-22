@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { PatientService } from '../services/patient.service.js';
 import { requireAuthenticatedUser } from '../middleware/auth.js';
-import { resolveClinicContext } from '../middleware/tenant.js';
+import { resolveHmsContext } from '../middleware/tenant.js';
 import { requireRole, requirePatientOwnership } from '../middleware/rbac.js';
 import { validateBody, validateQuery } from '../middleware/validate.js';
 import { prisma } from '../config/prisma.js';
@@ -9,7 +9,7 @@ import { createPatientSchema, updatePatientSchema, searchPatientSchema, ROLES } 
 
 export const patientRouter = Router();
 
-patientRouter.use(requireAuthenticatedUser, resolveClinicContext);
+patientRouter.use(requireAuthenticatedUser, resolveHmsContext);
 
 patientRouter.get('/me', async (req, res, next) => {
   try {

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma, UserRole } from '../config/prisma.js';
 
-export async function resolveClinicContext(req: Request, res: Response, next: NextFunction) {
+export async function resolveHmsContext(req: Request, res: Response, next: NextFunction) {
   if (!req.user) {
     return res.status(401).json({
       success: false,
@@ -94,7 +94,7 @@ export async function resolveClinicContext(req: Request, res: Response, next: Ne
   } catch (error: any) {
     return res.status(500).json({
       success: false,
-      error: { code: 'INTERNAL_SERVER_ERROR', message: 'Failed to resolve clinic context.', details: error.message },
+      error: { code: 'INTERNAL_SERVER_ERROR', message: 'Failed to resolve hospital context.', details: error.message },
     });
   }
 }
