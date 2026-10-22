@@ -1,0 +1,4 @@
+{
+  "prisma.schema": "backend/prisma/schema.prisma",
+  "prisma.envFile": "backend/.env"
+}
