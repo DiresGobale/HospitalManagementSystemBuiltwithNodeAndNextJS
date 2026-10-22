@@ -83,6 +83,7 @@ export default function PatientPortalPage() {
   const [bookingMsg, setBookingMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isBooking, setIsBooking] = useState(false);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+  const [clinicTimezone, setClinicTimezone] = useState('Africa/Addis_Ababa (UTC+3 / EAT)');
 
   // Real Payment Integration State (Card, Telebirr 0995774866 & CBE 1000305532472)
   const [bookingStep, setBookingStep] = useState<'details' | 'payment'>('details');
@@ -158,6 +159,9 @@ export default function PatientPortalPage() {
       if (meRes.success && meRes.data) {
         const pt = meRes.data;
         setPatientRecord(pt);
+        if (pt.clinic?.timezone) {
+          setClinicTimezone(pt.clinic.timezone);
+        }
         setProfileFullName(pt.fullName || user?.fullName || '');
         setProfilePhone(pt.phone || user?.phone || '');
         setProfileAddress(pt.address || '');
@@ -205,16 +209,16 @@ export default function PatientPortalPage() {
       if (srvRes.success && srvRes.data) {
         const activeServices = srvRes.data.filter((s: any) => s.isActive);
         setServices(activeServices);
-        if (activeServices.length > 0 && !selectedService) {
-          setSelectedService(activeServices[0].id);
+        if (activeServices.length > 0) {
+          setSelectedService((prev) => prev || activeServices[0].id);
         }
       }
 
       if (docRes.success && docRes.data) {
         const activeDoctors = docRes.data.filter((d: any) => d.isActive);
         setDoctors(activeDoctors);
-        if (activeDoctors.length > 0 && !selectedDoctor) {
-          setSelectedDoctor(activeDoctors[0].id);
+        if (activeDoctors.length > 0) {
+          setSelectedDoctor((prev) => prev || activeDoctors[0].id);
         }
       }
 
@@ -255,6 +259,19 @@ export default function PatientPortalPage() {
     }
   }, [activeMembership]);
 
+  // Ensure first service and doctor are selected if available
+  useEffect(() => {
+    if (services.length > 0 && !selectedService) {
+      setSelectedService(services[0].id);
+    }
+  }, [services, selectedService]);
+
+  useEffect(() => {
+    if (doctors.length > 0 && !selectedDoctor) {
+      setSelectedDoctor(doctors[0].id);
+    }
+  }, [doctors, selectedDoctor]);
+
   // Dynamic slot availability query for Booking Form
   useEffect(() => {
     async function fetchSlots() {
@@ -264,11 +281,23 @@ export default function PatientPortalPage() {
       }
       setIsLoadingSlots(true);
       try {
-        const res = await apiFetch(`/doctors/${selectedDoctor}/availability?date=${selectedDate}&duration=30`);
+        const queryParams = new URLSearchParams({
+          date: selectedDate,
+          duration: '30',
+          ...(selectedService ? { serviceId: selectedService } : {}),
+        });
+        const res = await apiFetch(`/doctors/${selectedDoctor}/availability?${queryParams.toString()}`);
         if (res.success && res.data?.slots) {
-          setAvailableSlots(res.data.slots);
-          if (res.data.slots.length > 0) {
-            setSelectedSlot(res.data.slots[0].start);
+          const slotsList = res.data.slots.filter((s: any) => s.isAvailable !== false);
+          setAvailableSlots(slotsList);
+          if (res.data.timeZone) {
+            setClinicTimezone(res.data.timeZone);
+          }
+          if (slotsList.length > 0) {
+            setSelectedSlot((prev) => {
+              const stillValid = slotsList.some((s: any) => (s.startTime || s.start) === prev);
+              return stillValid ? prev : (slotsList[0].startTime || slotsList[0].start);
+            });
           } else {
             setSelectedSlot('');
           }
@@ -285,7 +314,7 @@ export default function PatientPortalPage() {
     }
 
     fetchSlots();
-  }, [selectedDoctor, selectedDate]);
+  }, [selectedDoctor, selectedDate, selectedService]);
 
   // Dynamic slot availability query for Rescheduling Modal
   useEffect(() => {
@@ -298,9 +327,13 @@ export default function PatientPortalPage() {
       try {
         const res = await apiFetch(`/doctors/${reschedulingAppt.doctorId}/availability?date=${rescheduleDate}&duration=30`);
         if (res.success && res.data?.slots) {
-          setRescheduleSlots(res.data.slots);
-          if (res.data.slots.length > 0) {
-            setSelectedRescheduleSlot(res.data.slots[0].start);
+          const slotsList = res.data.slots.filter((s: any) => s.isAvailable !== false);
+          setRescheduleSlots(slotsList);
+          if (slotsList.length > 0) {
+            setSelectedRescheduleSlot((prev) => {
+              const stillValid = slotsList.some((s: any) => (s.startTime || s.start) === prev);
+              return stillValid ? prev : (slotsList[0].startTime || slotsList[0].start);
+            });
           } else {
             setSelectedRescheduleSlot('');
           }
@@ -387,7 +420,7 @@ export default function PatientPortalPage() {
           reasonForVisit: bookingReason || 'General Medical Consultation',
           payment: {
             method: paymentMethod,
-            transactionRef: paymentTxnRef.trim(),
+            transactionRef: txnCode,
             payerPhone: paymentPayerPhone.trim() || undefined,
             payerAccount: paymentMethod === 'CBE' ? (paymentPayerAccount.trim() || undefined) : undefined,
             payerName: paymentPayerName.trim() || undefined,
@@ -1244,7 +1277,14 @@ export default function PatientPortalPage() {
 
               {/* Service Selection */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Medical Service / Treatment</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700">Medical Service / Treatment</label>
+                  {selectedService && (
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      Fee: {Number(services.find((s) => s.id === selectedService)?.price || 0).toFixed(2)} ETB • {services.find((s) => s.id === selectedService)?.durationMinutes || 30} mins
+                    </span>
+                  )}
+                </div>
                 <select
                   required
                   value={selectedService}
@@ -1262,7 +1302,14 @@ export default function PatientPortalPage() {
 
               {/* Doctor Selection */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Select Physician / Specialist</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700">Select Physician / Specialist</label>
+                  {selectedDoctor && (
+                    <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                      {doctors.find((d) => d.id === selectedDoctor)?.specialty || 'General Practitioner'}
+                    </span>
+                  )}
+                </div>
                 <select
                   required
                   value={selectedDoctor}
@@ -1280,21 +1327,49 @@ export default function PatientPortalPage() {
 
               {/* Date Selection */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">Appointment Date</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700">Appointment Date</label>
+                  <div className="flex items-center space-x-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const tomorrow = new Date();
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+                        setSelectedDate(tomorrow.toISOString().split('T')[0]);
+                      }}
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                    >
+                      Tomorrow
+                    </button>
+                  </div>
+                </div>
                 <input
                   type="date"
                   required
                   min={new Date().toISOString().split('T')[0]}
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full text-xs border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium"
+                  className="w-full text-xs border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium bg-white"
                 />
               </div>
 
               {/* Available Time Slots */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-slate-700">Available Time Slots</label>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-slate-700">Available Consultation Slots</label>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-indigo-600" />
+                      <span>Facility Timezone: {clinicTimezone}</span>
+                    </span>
+                  </div>
                   {isLoadingSlots && (
                     <span className="text-[11px] text-blue-600 font-semibold flex items-center gap-1">
                       <RefreshCw className="w-3 h-3 animate-spin" /> Querying schedule...
@@ -1304,27 +1379,58 @@ export default function PatientPortalPage() {
 
                 <div className="border border-slate-200 rounded-2xl p-3 bg-slate-50/50">
                   {availableSlots.length > 0 ? (
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto p-1">
-                      {availableSlots.map((slot) => (
-                        <button
-                          key={slot.start}
-                          type="button"
-                          onClick={() => setSelectedSlot(slot.start)}
-                          className={`py-2 px-3 text-xs rounded-xl border text-center transition font-mono ${
-                            selectedSlot === slot.start
-                              ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-sm'
-                              : 'border-slate-200 hover:border-blue-400 bg-white text-slate-700'
-                          }`}
-                        >
-                          {slot.startFormatted || new Date(slot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </button>
-                      ))}
+                    <div>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-52 overflow-y-auto p-1">
+                        {availableSlots.map((slot) => {
+                          const slotVal = slot.startTime || slot.start;
+                          const isSelected = selectedSlot === slotVal;
+                          const label = slot.startFormatted 
+                            ? slot.endFormatted ? `${slot.startFormatted} - ${slot.endFormatted}` : slot.startFormatted
+                            : new Date(slotVal).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                          return (
+                            <button
+                              key={slotVal}
+                              type="button"
+                              onClick={() => setSelectedSlot(slotVal)}
+                              className={`py-2 px-2.5 text-[11px] rounded-xl border text-center transition font-mono ${
+                                isSelected
+                                  ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-sm'
+                                  : 'border-slate-200 hover:border-blue-400 bg-white text-slate-700'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-3 pt-2.5 border-t border-slate-200/70 flex items-center justify-between text-[11px] text-slate-500">
+                        <span className="flex items-center gap-1 text-emerald-700 font-medium">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          {availableSlots.length} consultation slots open on {selectedDate}
+                        </span>
+                        <span>Times matched to local hospital facility clock ({clinicTimezone})</span>
+                      </div>
                     </div>
                   ) : (
-                    <div className="py-6 text-center text-xs text-slate-400">
-                      {selectedDoctor
-                        ? 'No available consultation slots found for this date. Please try another day.'
-                        : 'Please select a doctor to view available appointment slots.'}
+                    <div className="py-6 text-center text-xs text-slate-500 space-y-2">
+                      <p>
+                        {selectedDoctor
+                          ? `No open consultation slots found for ${selectedDate}.`
+                          : 'Please select a doctor above to view open slots.'}
+                      </p>
+                      {selectedDoctor && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextDay = new Date(selectedDate);
+                            nextDay.setDate(nextDay.getDate() + 1);
+                            setSelectedDate(nextDay.toISOString().split('T')[0]);
+                          }}
+                          className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200"
+                        >
+                          Check Next Day →
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2765,6 +2871,9 @@ export default function PatientPortalPage() {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-bold text-slate-700">Open Slots on New Date</label>
+                  <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                    {clinicTimezone}
+                  </span>
                   {isLoadingRescheduleSlots && (
                     <span className="text-[11px] text-blue-600 font-semibold flex items-center gap-1">
                       <RefreshCw className="w-3 h-3 animate-spin" /> Querying...
@@ -2775,20 +2884,25 @@ export default function PatientPortalPage() {
                 <div className="border border-slate-200 rounded-2xl p-2.5 bg-slate-50/50">
                   {rescheduleSlots.length > 0 ? (
                     <div className="grid grid-cols-3 gap-2 max-h-36 overflow-y-auto p-1">
-                      {rescheduleSlots.map((slot) => (
-                        <button
-                          key={slot.start}
-                          type="button"
-                          onClick={() => setSelectedRescheduleSlot(slot.start)}
-                          className={`py-1.5 px-2 text-xs rounded-lg border text-center transition font-mono ${
-                            selectedRescheduleSlot === slot.start
-                              ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-sm'
-                              : 'border-slate-200 hover:border-blue-400 bg-white text-slate-700'
-                          }`}
-                        >
-                          {slot.startFormatted || new Date(slot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </button>
-                      ))}
+                      {rescheduleSlots.map((slot) => {
+                        const slotVal = slot.startTime || slot.start;
+                        const isSelected = selectedRescheduleSlot === slotVal;
+                        const label = slot.startFormatted || new Date(slotVal).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        return (
+                          <button
+                            key={slotVal}
+                            type="button"
+                            onClick={() => setSelectedRescheduleSlot(slotVal)}
+                            className={`py-1.5 px-2 text-xs rounded-lg border text-center transition font-mono ${
+                              isSelected
+                                ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-sm'
+                                : 'border-slate-200 hover:border-blue-400 bg-white text-slate-700'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="py-4 text-center text-xs text-slate-400">

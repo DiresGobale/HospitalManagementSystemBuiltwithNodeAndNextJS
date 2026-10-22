@@ -191,6 +191,12 @@ export class DoctorService {
       throw { statusCode: 404, code: 'DOCTOR_NOT_FOUND', message: 'Doctor not found.' };
     }
 
+    const clinic = await prisma.clinic.findUnique({
+      where: { id: clinicId },
+      select: { timezone: true, name: true },
+    });
+    const timeZone = clinic?.timezone || 'Africa/Addis_Ababa';
+
     let slotDuration = doctor.appointmentDurationMinutes || 30;
     if (serviceId) {
       const service = await prisma.service.findFirst({
@@ -203,21 +209,19 @@ export class DoctorService {
 
     const exception = doctor.scheduleExceptions[0];
     if (exception && !exception.isAvailable) {
-      return { date, doctorId, slots: [] };
+      return { date, doctorId, timeZone, slotDurationMinutes: slotDuration, slots: [] };
     }
 
     const targetDate = new Date(`${date}T00:00:00Z`);
     const dayOfWeek = targetDate.getUTCDay();
 
     const regularSchedule = doctor.doctorSchedules.find((s) => s.dayOfWeek === dayOfWeek);
-    if (!regularSchedule && !exception) {
-      return { date, doctorId, slots: [] };
-    }
 
-    const startTimeStr = exception?.startTime || regularSchedule?.startTime || '09:00';
+    // Standard hospital outpatient consultation shift default if no custom schedule is set (08:30 - 17:00, lunch 12:30 - 13:30)
+    const startTimeStr = exception?.startTime || regularSchedule?.startTime || '08:30';
     const endTimeStr = exception?.endTime || regularSchedule?.endTime || '17:00';
-    const breakStartStr = regularSchedule?.breakStartTime;
-    const breakEndStr = regularSchedule?.breakEndTime;
+    const breakStartStr = regularSchedule?.breakStartTime || '12:30';
+    const breakEndStr = regularSchedule?.breakEndTime || '13:30';
 
     const [startH, startM] = startTimeStr.split(':').map(Number);
     const [endH, endM] = endTimeStr.split(':').map(Number);
@@ -247,7 +251,16 @@ export class DoctorService {
       select: { scheduledStartAt: true, scheduledEndAt: true },
     });
 
-    const slots: Array<{ startTime: string; endTime: string; isAvailable: boolean }> = [];
+    const slots: Array<{
+      start: string;
+      startTime: string;
+      end: string;
+      endTime: string;
+      startFormatted: string;
+      endFormatted: string;
+      timeZone: string;
+      isAvailable: boolean;
+    }> = [];
 
     for (let m = startMinutes; m + slotDuration <= endMinutes; m += slotDuration) {
       const slotStartH = Math.floor(m / 60).toString().padStart(2, '0');
@@ -278,8 +291,13 @@ export class DoctorService {
       }
 
       slots.push({
+        start: slotStartIso,
         startTime: slotStartIso,
+        end: slotEndIso,
         endTime: slotEndIso,
+        startFormatted: `${slotStartH}:${slotStartM}`,
+        endFormatted: `${slotEndH}:${slotEndM}`,
+        timeZone,
         isAvailable: !overlapsBreak && !overlapsAppointment,
       });
     }
@@ -287,6 +305,7 @@ export class DoctorService {
     return {
       date,
       doctorId,
+      timeZone,
       slotDurationMinutes: slotDuration,
       slots,
     };

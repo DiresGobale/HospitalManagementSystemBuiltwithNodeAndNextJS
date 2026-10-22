@@ -12,11 +12,21 @@ export const clinicRouter = Router();
 
 clinicRouter.get('/public', async (_req, res, next) => {
   try {
-    const clinics = await prisma.clinic.findMany({
-      where: { status: ClinicStatus.ACTIVE },
-      select: { id: true, name: true, slug: true, address: true, phone: true },
+    let clinics = await prisma.clinic.findMany({
+      where: {
+        status: ClinicStatus.ACTIVE,
+        NOT: { slug: { startsWith: 'test-clinic-' } },
+      },
+      select: { id: true, name: true, slug: true, address: true, phone: true, timezone: true },
       orderBy: { name: 'asc' },
     });
+    if (clinics.length === 0) {
+      clinics = await prisma.clinic.findMany({
+        where: { status: ClinicStatus.ACTIVE },
+        select: { id: true, name: true, slug: true, address: true, phone: true, timezone: true },
+        orderBy: { name: 'asc' },
+      });
+    }
     res.json({ success: true, data: clinics });
   } catch (err) {
     next(err);

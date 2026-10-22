@@ -16,6 +16,7 @@ patientRouter.get('/me', async (req, res, next) => {
     let patient = await prisma.patient.findFirst({
       where: { clinicId: req.clinicId!, userId: req.user!.userId, archivedAt: null },
       include: {
+        clinic: { select: { id: true, name: true, slug: true, timezone: true, address: true, phone: true } },
         user: { select: { id: true, fullName: true, email: true, phone: true } },
         appointments: {
           orderBy: { scheduledStartAt: 'desc' },
@@ -61,6 +62,7 @@ patientRouter.get('/me', async (req, res, next) => {
           consentStatus: true,
         },
         include: {
+          clinic: { select: { id: true, name: true, slug: true, timezone: true, address: true, phone: true } },
           user: { select: { id: true, fullName: true, email: true, phone: true } },
           appointments: {
             orderBy: { scheduledStartAt: 'desc' },

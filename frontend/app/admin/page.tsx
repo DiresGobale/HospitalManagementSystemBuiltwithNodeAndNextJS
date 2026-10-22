@@ -2108,6 +2108,8 @@ export default function AdminDashboardPage() {
                   onChange={(e) => setClinicTimezone(e.target.value)}
                   className="w-full text-xs border border-slate-300 rounded-xl px-3 py-2 bg-white outline-none focus:border-purple-600"
                 >
+                  <option value="Africa/Addis_Ababa">Africa/Addis_Ababa (East Africa Time / UTC+3)</option>
+                  <option value="Africa/Nairobi">Africa/Nairobi (EAT / UTC+3)</option>
                   <option value="UTC">UTC (Universal Coordinated Time)</option>
                   <option value="America/New_York">America/New_York (Eastern)</option>
                   <option value="America/Chicago">America/Chicago (Central)</option>

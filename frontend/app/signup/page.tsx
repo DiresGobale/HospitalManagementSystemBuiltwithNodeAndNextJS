@@ -315,7 +315,7 @@ export default function SignUpPage() {
                         required
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        placeholder="e.g. Sarah Jenkins"
+                        placeholder="e.g. hospital patient"
                         className="w-full text-xs border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 bg-white outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 transition"
                       />
                     </div>
@@ -333,7 +333,7 @@ export default function SignUpPage() {
                           required
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          placeholder="sarah@example.com"
+                          placeholder="hospital@example.com"
                           className="w-full text-xs border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 bg-white outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 transition"
                         />
                       </div>
@@ -350,7 +350,7 @@ export default function SignUpPage() {
                           required
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
-                          placeholder="+1-555-0199"
+                          placeholder="+251 995 774 866"
                           className="w-full text-xs border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 bg-white outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 transition"
                         />
                       </div>
@@ -448,7 +448,7 @@ export default function SignUpPage() {
                           type="tel"
                           value={emergencyContact}
                           onChange={(e) => setEmergencyContact(e.target.value)}
-                          placeholder="+1-555-0911"
+                          placeholder="+251 995 774 866"
                           className="w-full text-xs border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 bg-white outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 transition"
                         />
                       </div>

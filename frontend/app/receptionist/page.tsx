@@ -170,16 +170,18 @@ export default function ReceptionistDashboardPage() {
       if (docRes.success) {
         const activeDocs = (docRes.data || []).filter((d: any) => d.isActive);
         setDoctors(activeDocs);
-        if (activeDocs.length > 0 && !assignedDoctorId) {
-          setAssignedDoctorId(activeDocs[0].id);
+        if (activeDocs.length > 0) {
+          setAssignedDoctorId((prev) => prev || activeDocs[0].id);
+          setAddPtDoctorId((prev) => prev || activeDocs[0].id);
         }
       }
 
       if (srvRes.success) {
         const activeSrvs = (srvRes.data || []).filter((s: any) => s.isActive);
         setServices(activeSrvs);
-        if (activeSrvs.length > 0 && !walkinServiceId) {
-          setWalkinServiceId(activeSrvs[0].id);
+        if (activeSrvs.length > 0) {
+          setWalkinServiceId((prev) => prev || activeSrvs[0].id);
+          setAddPtServiceId((prev) => prev || activeSrvs[0].id);
         }
       }
 

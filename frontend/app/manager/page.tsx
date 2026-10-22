@@ -910,7 +910,7 @@ export default function ManagerDashboardPage() {
                   >
                     <option value="">-- Select Doctor --</option>
                     {doctors.map((d) => (
-                      <option key={d.id} value={d.id}>{d.fullName}</option>
+                      <option key={d.id} value={d.id}>Dr. {d.fullName} ({d.specialty})</option>
                     ))}
                   </select>
                 </div>
@@ -923,7 +923,7 @@ export default function ManagerDashboardPage() {
                   >
                     <option value="">-- Choose Service --</option>
                     {services.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name} (${Number(s.price).toFixed(2)})</option>
+                      <option key={s.id} value={s.id}>{s.name} ({Number(s.price).toFixed(2)} ETB)</option>
                     ))}
                   </select>
                 </div>

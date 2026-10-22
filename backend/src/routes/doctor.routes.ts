@@ -23,6 +23,27 @@ doctorRouter.get(
   }
 );
 
+doctorRouter.get(
+  '/:doctorId/availability',
+  requireAuthenticatedUser,
+  resolveHmsContext,
+  async (req, res, next) => {
+    try {
+      const { doctorId } = req.params;
+      const date = (req.query.date as string) || new Date().toISOString().split('T')[0];
+      const serviceId = req.query.serviceId as string | undefined;
+      const availability = await DoctorService.getAvailability(req.clinicId!, {
+        doctorId,
+        date,
+        serviceId,
+      });
+      res.json({ success: true, data: availability });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 doctorRouter.get('/', requireAuthenticatedUser, resolveHmsContext, async (req, res, next) => {
   try {
     const branchId = req.query.branchId as string | undefined;
