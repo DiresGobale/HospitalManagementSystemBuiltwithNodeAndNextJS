@@ -14,14 +14,28 @@ export async function resolveHmsContext(req: Request, res: Response, next: NextF
     req.params.clinicId ||
     (req.query.clinicId as string);
 
-  if (!rawClinicId) {
+  let clinicId = rawClinicId ? String(rawClinicId).trim() : null;
+
+  if (!clinicId) {
+    const primaryMembership = await prisma.clinicMembership.findFirst({
+      where: {
+        userId: req.user.userId,
+        status: 'ACTIVE',
+      },
+      include: { clinic: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (primaryMembership) {
+      clinicId = primaryMembership.clinicId;
+    }
+  }
+
+  if (!clinicId) {
     return res.status(400).json({
       success: false,
       error: { code: 'MISSING_CLINIC_CONTEXT', message: 'Hospital facility identifier (x-clinic-id) is required for this operation.' },
     });
   }
-
-  const clinicId = String(rawClinicId).trim();
 
   try {
     const membership = await prisma.clinicMembership.findFirst({

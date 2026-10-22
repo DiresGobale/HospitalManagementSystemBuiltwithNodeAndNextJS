@@ -59,6 +59,13 @@ export default function PatientPortalPage() {
   const { user, activeMembership, isLoading } = useAuth();
   const router = useRouter();
 
+  // Fallback clinic resolution for seamless tenant isolation
+  const effectiveClinicId =
+    activeMembership?.clinicId ||
+    user?.memberships?.[0]?.clinicId ||
+    (typeof window !== 'undefined' ? localStorage.getItem('caqms_active_clinic_id') : null) ||
+    '';
+
   // Navigation tab
   const [activeTab, setActiveTab] = useState<'portal' | 'book' | 'tracker' | 'diagnostics' | 'pharmacy' | 'history' | 'profile'>('portal');
   const [selectedDiagnosticReport, setSelectedDiagnosticReport] = useState<any>(null);
@@ -149,11 +156,11 @@ export default function PatientPortalPage() {
 
   // Load patient, appointments, queue tickets and facility data directly from DB
   const loadPatientData = async () => {
-    if (!activeMembership?.clinicId) return;
+    if (!effectiveClinicId) return;
     setIsDataLoading(true);
 
     try {
-      const clinicId = activeMembership.clinicId;
+      const clinicId = effectiveClinicId;
       const [meRes, apptRes, srvRes, docRes, brRes] = await Promise.all([
         apiFetch('/patients/me', { clinicId }),
         apiFetch('/appointments', { clinicId }),
@@ -214,26 +221,24 @@ export default function PatientPortalPage() {
 
       // 3. Process Facilities & Services
       if (srvRes.success && srvRes.data) {
-        const activeServices = srvRes.data.filter((s: any) => s.isActive);
+        const activeServices = srvRes.data.filter((s: any) => s.isActive !== false);
         setServices(activeServices);
         if (activeServices.length > 0) {
-          setSelectedService((prev) => prev || activeServices[0].id);
+          setSelectedService((prev) => (prev && activeServices.some((s: any) => s.id === prev) ? prev : activeServices[0].id));
         }
       }
 
       if (docRes.success && docRes.data) {
-        const activeDoctors = docRes.data.filter((d: any) => d.isActive);
+        const activeDoctors = docRes.data.filter((d: any) => d.isActive !== false);
         setDoctors(activeDoctors);
         if (activeDoctors.length > 0) {
-          setSelectedDoctor((prev) => prev || activeDoctors[0].id);
+          setSelectedDoctor((prev) => (prev && activeDoctors.some((d: any) => d.id === prev) ? prev : activeDoctors[0].id));
         }
       }
 
       if (brRes.success && brRes.data && brRes.data.length > 0) {
         setBranches(brRes.data);
-        if (!selectedBranch) {
-          setSelectedBranch(brRes.data[0].id);
-        }
+        setSelectedBranch((prev) => (prev && brRes.data.some((b: any) => b.id === prev) ? prev : brRes.data[0].id));
       }
     } catch (err) {
       console.error('Failed to load patient data from database:', err);
@@ -260,24 +265,50 @@ export default function PatientPortalPage() {
     setIsRefreshingQueue(false);
   };
 
+  // Automatic data loading when clinic context or authenticated user resolves
   useEffect(() => {
-    if (activeMembership?.clinicId) {
+    if (effectiveClinicId) {
       loadPatientData();
     }
-  }, [activeMembership]);
-
-  // Ensure first service and doctor are selected if available
-  useEffect(() => {
-    if (services.length > 0 && !selectedService) {
-      setSelectedService(services[0].id);
-    }
-  }, [services, selectedService]);
+  }, [effectiveClinicId]);
 
   useEffect(() => {
-    if (doctors.length > 0 && !selectedDoctor) {
-      setSelectedDoctor(doctors[0].id);
+    if (user && effectiveClinicId && (!services.length || !doctors.length)) {
+      loadPatientData();
     }
-  }, [doctors, selectedDoctor]);
+  }, [user, effectiveClinicId, services.length, doctors.length]);
+
+  // Ensure first service is automatically selected
+  useEffect(() => {
+    if (services.length > 0) {
+      setSelectedService((prev) => (prev && services.some((s: any) => s.id === prev) ? prev : services[0].id));
+    }
+  }, [services]);
+
+  // Ensure first or matching doctor is automatically selected
+  useEffect(() => {
+    if (doctors.length > 0) {
+      setSelectedDoctor((prev) => {
+        if (prev && doctors.some((d: any) => d.id === prev)) {
+          return prev;
+        }
+        if (selectedService) {
+          const matchDoc = doctors.find((d: any) =>
+            d.doctorServices?.some((ds: any) => ds.serviceId === selectedService || ds.service?.id === selectedService)
+          );
+          if (matchDoc) return matchDoc.id;
+        }
+        return doctors[0].id;
+      });
+    }
+  }, [doctors, selectedService]);
+
+  // Ensure first branch is automatically selected
+  useEffect(() => {
+    if (branches.length > 0) {
+      setSelectedBranch((prev) => (prev && branches.some((b: any) => b.id === prev) ? prev : branches[0].id));
+    }
+  }, [branches]);
 
   // Dynamic slot availability query for Booking Form
   useEffect(() => {
@@ -293,7 +324,9 @@ export default function PatientPortalPage() {
           duration: '30',
           ...(selectedService ? { serviceId: selectedService } : {}),
         });
-        const res = await apiFetch(`/doctors/${selectedDoctor}/availability?${queryParams.toString()}`, { clinicId: activeMembership?.clinicId });
+        const res = await apiFetch(`/doctors/${selectedDoctor}/availability?${queryParams.toString()}`, {
+          clinicId: effectiveClinicId,
+        });
         if (res.success && res.data?.slots) {
           const slotsList = res.data.slots.filter((s: any) => s.isAvailable !== false);
           setAvailableSlots(slotsList);
@@ -313,6 +346,7 @@ export default function PatientPortalPage() {
           setSelectedSlot('');
         }
       } catch (err) {
+        console.error('Failed to query doctor slots:', err);
         setAvailableSlots([]);
         setSelectedSlot('');
       } finally {
@@ -321,7 +355,19 @@ export default function PatientPortalPage() {
     }
 
     fetchSlots();
-  }, [selectedDoctor, selectedDate, selectedService]);
+  }, [selectedDoctor, selectedDate, selectedService, effectiveClinicId]);
+
+  // Auto-select first slot as soon as availableSlots populate
+  useEffect(() => {
+    if (availableSlots.length > 0) {
+      setSelectedSlot((prev) => {
+        const slotValues = availableSlots.map((s: any) => s.startTime || s.start);
+        return prev && slotValues.includes(prev) ? prev : slotValues[0];
+      });
+    } else {
+      setSelectedSlot('');
+    }
+  }, [availableSlots]);
 
   // Dynamic slot availability query for Rescheduling Modal
   useEffect(() => {
@@ -332,7 +378,9 @@ export default function PatientPortalPage() {
       }
       setIsLoadingRescheduleSlots(true);
       try {
-        const res = await apiFetch(`/doctors/${reschedulingAppt.doctorId}/availability?date=${rescheduleDate}&duration=30`, { clinicId: activeMembership?.clinicId });
+        const res = await apiFetch(`/doctors/${reschedulingAppt.doctorId}/availability?date=${rescheduleDate}&duration=30`, {
+          clinicId: effectiveClinicId,
+        });
         if (res.success && res.data?.slots) {
           const slotsList = res.data.slots.filter((s: any) => s.isAvailable !== false);
           setRescheduleSlots(slotsList);
@@ -359,7 +407,7 @@ export default function PatientPortalPage() {
     if (reschedulingAppt) {
       fetchRescheduleSlots();
     }
-  }, [reschedulingAppt, rescheduleDate]);
+  }, [reschedulingAppt, rescheduleDate, effectiveClinicId]);
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -431,11 +479,26 @@ export default function PatientPortalPage() {
     const amountVal = Number(srv?.price || 500);
 
     try {
+      let targetPatientId = patientRecord?.id;
+      if (!targetPatientId) {
+        const meRes = await apiFetch<any>('/patients/me', { clinicId: effectiveClinicId });
+        if (meRes.success && meRes.data?.id) {
+          targetPatientId = meRes.data.id;
+          setPatientRecord(meRes.data);
+        }
+      }
+
+      if (!targetPatientId) {
+        setBookingMsg({ type: 'error', text: 'Patient record could not be loaded. Please refresh the page.' });
+        setIsBooking(false);
+        return;
+      }
+
       const res = await apiFetch('/appointments', {
         method: 'POST',
-        clinicId: activeMembership?.clinicId,
+        clinicId: effectiveClinicId,
         body: JSON.stringify({
-          patientId: patientRecord?.id,
+          patientId: targetPatientId,
           doctorId: selectedDoctor,
           serviceId: selectedService,
           branchId: selectedBranch || undefined,
@@ -623,7 +686,7 @@ export default function PatientPortalPage() {
     try {
       const res = await apiFetch('/patients/me', {
         method: 'PATCH',
-        clinicId: activeMembership?.clinicId,
+        clinicId: effectiveClinicId,
         body: JSON.stringify({
           fullName: profileFullName.trim(),
           phone: profilePhone.trim() ? validateEthiopianPhone(profilePhone).normalized : profilePhone.trim(),
@@ -1340,7 +1403,7 @@ export default function PatientPortalPage() {
                   onChange={(e) => setSelectedService(e.target.value)}
                   className="w-full text-xs border border-slate-200 rounded-xl p-3 bg-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium"
                 >
-                  <option value="">Select Service...</option>
+                  {!selectedService && <option value="">Select Medical Service...</option>}
                   {services.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name} • {s.durationMinutes} mins ({Number(s.price).toFixed(2)} ETB)
@@ -1365,7 +1428,7 @@ export default function PatientPortalPage() {
                   onChange={(e) => setSelectedDoctor(e.target.value)}
                   className="w-full text-xs border border-slate-200 rounded-xl p-3 bg-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium"
                 >
-                  <option value="">Select Doctor...</option>
+                  {!selectedDoctor && <option value="">Select Physician / Specialist...</option>}
                   {doctors.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.fullName} — {d.specialty}
@@ -1378,25 +1441,32 @@ export default function PatientPortalPage() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold text-slate-700">Appointment Date</label>
-                  <div className="flex items-center space-x-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
-                      className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
-                    >
-                      Today
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const tomorrow = new Date();
-                        tomorrow.setDate(tomorrow.getDate() + 1);
-                        setSelectedDate(tomorrow.toISOString().split('T')[0]);
-                      }}
-                      className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
-                    >
-                      Tomorrow
-                    </button>
+                  <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                    {[
+                      { label: 'Today', offset: 0 },
+                      { label: 'Tomorrow', offset: 1 },
+                      { label: '+2 Days', offset: 2 },
+                      { label: '+3 Days', offset: 3 },
+                    ].map((btn) => {
+                      const d = new Date();
+                      d.setDate(d.getDate() + btn.offset);
+                      const isoDate = d.toISOString().split('T')[0];
+                      const isSelected = selectedDate === isoDate;
+                      return (
+                        <button
+                          key={btn.label}
+                          type="button"
+                          onClick={() => setSelectedDate(isoDate)}
+                          className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg transition ${
+                            isSelected
+                              ? 'bg-blue-600 text-white font-bold shadow-xs'
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {btn.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
                 <input
@@ -1411,12 +1481,12 @@ export default function PatientPortalPage() {
 
               {/* Available Time Slots */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <label className="text-xs font-bold text-slate-700">Available Consultation Slots</label>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-indigo-600" />
-                      <span>Facility Timezone: {clinicTimezone}</span>
+                    <span className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1.5 shadow-xs">
+                      <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Facility Timezone: {clinicTimezone} (08:30 - 17:00 Consultation Shift)</span>
                     </span>
                   </div>
                   {isLoadingSlots && (
@@ -1427,7 +1497,12 @@ export default function PatientPortalPage() {
                 </div>
 
                 <div className="border border-slate-200 rounded-2xl p-3 bg-slate-50/50">
-                  {availableSlots.length > 0 ? (
+                  {isLoadingSlots ? (
+                    <div className="py-8 flex flex-col items-center justify-center space-y-2 text-slate-500 text-xs">
+                      <RefreshCw className="w-5 h-5 text-blue-600 animate-spin" />
+                      <span>Checking real-time doctor consultation slots...</span>
+                    </div>
+                  ) : availableSlots.length > 0 ? (
                     <div>
                       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-52 overflow-y-auto p-1">
                         {availableSlots.map((slot) => {
@@ -1441,23 +1516,24 @@ export default function PatientPortalPage() {
                               key={slotVal}
                               type="button"
                               onClick={() => setSelectedSlot(slotVal)}
-                              className={`py-2 px-2.5 text-[11px] rounded-xl border text-center transition font-mono ${
+                              className={`py-2 px-2.5 text-[11px] rounded-xl border text-center transition font-mono flex items-center justify-center gap-1 ${
                                 isSelected
                                   ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-sm'
-                                  : 'border-slate-200 hover:border-blue-400 bg-white text-slate-700'
+                                  : 'border-slate-200 hover:border-blue-400 bg-white text-slate-700 hover:bg-blue-50/50'
                               }`}
                             >
-                              {label}
+                              {isSelected && <Check className="w-3 h-3 shrink-0" />}
+                              <span>{label}</span>
                             </button>
                           );
                         })}
                       </div>
                       <div className="mt-3 pt-2.5 border-t border-slate-200/70 flex items-center justify-between text-[11px] text-slate-500">
-                        <span className="flex items-center gap-1 text-emerald-700 font-medium">
+                        <span className="flex items-center gap-1 text-emerald-700 font-semibold">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                           {availableSlots.length} consultation slots open on {selectedDate}
                         </span>
-                        <span>Times matched to local hospital facility clock ({clinicTimezone})</span>
+                        <span className="font-medium text-slate-600">Local facility clock ({clinicTimezone})</span>
                       </div>
                     </div>
                   ) : (
@@ -1797,7 +1873,7 @@ export default function PatientPortalPage() {
                         if (paymentMethod === 'TELEBIRR') {
                           setPaymentPayerPhone(sanitizePhoneInput(e.target.value));
                         } else {
-                          setPaymentPayerAccount(e.target.value);
+                          setPaymentPayerAccount(e.target.value.replace(/\D/g, ''));
                         }
                       }}
                       className="w-full text-xs border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 font-mono"
