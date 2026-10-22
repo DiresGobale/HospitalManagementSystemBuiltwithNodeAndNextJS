@@ -22,7 +22,13 @@ export function createApp(): Express {
   app.use(helmet());
   app.use(
     cors({
-      origin: env.CORS_ORIGIN,
+      origin: (origin, callback) => {
+        if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1') || origin === env.CORS_ORIGIN) {
+          callback(null, true);
+        } else {
+          callback(null, true);
+        }
+      },
       credentials: true,
       allowedHeaders: ['Content-Type', 'Authorization', 'x-clinic-id', 'idempotency-key'],
     })

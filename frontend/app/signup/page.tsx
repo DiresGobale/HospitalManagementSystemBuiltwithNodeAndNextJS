@@ -36,7 +36,7 @@ import {
 
 export default function SignUpPage() {
   const router = useRouter();
-  const { user, activeMembership, registerPatient } = useAuth();
+  const { user, activeMembership, registerPatient, logout } = useAuth();
 
   // Password visibility states
   const [showPassword, setShowPassword] = useState(false);
@@ -171,12 +171,8 @@ export default function SignUpPage() {
     setIsLoading(false);
 
     if (res.success) {
-      // Clear any auto-login session so patient logs in deliberately per required workflow
-      try {
-        localStorage.removeItem('caqms_access_token');
-        localStorage.removeItem('caqms_refresh_token');
-        localStorage.removeItem('caqms_active_clinic_id');
-      } catch (e) {}
+      // Clear session so patient logs in deliberately per required workflow
+      logout();
 
       setSuccessMsg('Patient account registered successfully! Redirecting to login page...');
       setTimeout(() => {

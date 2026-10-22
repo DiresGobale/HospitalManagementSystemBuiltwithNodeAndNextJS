@@ -149,13 +149,16 @@ export default function PatientPortalPage() {
 
   // Authentication check
   useEffect(() => {
-    if (!isLoading && !user) {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('caqms_access_token') : null;
+    if (!isLoading && (!user || !token)) {
       router.push('/login');
     }
   }, [user, isLoading, router]);
 
   // Load patient, appointments, queue tickets and facility data directly from DB
   const loadPatientData = async () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('caqms_access_token') : null;
+    if (!token) return;
     if (!effectiveClinicId) return;
     setIsDataLoading(true);
 
@@ -205,7 +208,7 @@ export default function PatientPortalPage() {
       }
 
       // 2. Process Appointments
-      if (apptRes.success) {
+      if (apptRes.success && apptRes.data) {
         const apptList = apptRes.data.items || [];
         setAppointments(apptList);
 
@@ -220,7 +223,7 @@ export default function PatientPortalPage() {
       }
 
       // 3. Process Facilities & Services
-      if (srvRes.success && srvRes.data) {
+      if (srvRes.success && Array.isArray(srvRes.data)) {
         const activeServices = srvRes.data.filter((s: any) => s.isActive !== false);
         setServices(activeServices);
         if (activeServices.length > 0) {
@@ -228,7 +231,7 @@ export default function PatientPortalPage() {
         }
       }
 
-      if (docRes.success && docRes.data) {
+      if (docRes.success && Array.isArray(docRes.data)) {
         const activeDoctors = docRes.data.filter((d: any) => d.isActive !== false);
         setDoctors(activeDoctors);
         if (activeDoctors.length > 0) {
@@ -236,7 +239,7 @@ export default function PatientPortalPage() {
         }
       }
 
-      if (brRes.success && brRes.data && brRes.data.length > 0) {
+      if (brRes.success && Array.isArray(brRes.data) && brRes.data.length > 0) {
         setBranches(brRes.data);
         setSelectedBranch((prev) => (prev && brRes.data.some((b: any) => b.id === prev) ? prev : brRes.data[0].id));
       }
@@ -313,18 +316,22 @@ export default function PatientPortalPage() {
   // Dynamic slot availability query for Booking Form
   useEffect(() => {
     async function fetchSlots() {
-      if (!selectedDoctor || !selectedDate) {
+      const activeDoc = selectedDoctor || (doctors.length > 0 ? doctors[0].id : '');
+      const activeSrv = selectedService || (services.length > 0 ? services[0].id : '');
+      const activeDate = selectedDate || new Date().toISOString().split('T')[0];
+
+      if (!activeDoc || !activeDate) {
         setAvailableSlots([]);
         return;
       }
       setIsLoadingSlots(true);
       try {
         const queryParams = new URLSearchParams({
-          date: selectedDate,
+          date: activeDate,
           duration: '30',
-          ...(selectedService ? { serviceId: selectedService } : {}),
+          ...(activeSrv ? { serviceId: activeSrv } : {}),
         });
-        const res = await apiFetch(`/doctors/${selectedDoctor}/availability?${queryParams.toString()}`, {
+        const res = await apiFetch(`/doctors/${activeDoc}/availability?${queryParams.toString()}`, {
           clinicId: effectiveClinicId,
         });
         if (res.success && res.data?.slots) {
@@ -355,7 +362,7 @@ export default function PatientPortalPage() {
     }
 
     fetchSlots();
-  }, [selectedDoctor, selectedDate, selectedService, effectiveClinicId]);
+  }, [selectedDoctor, selectedDate, selectedService, effectiveClinicId, doctors.length]);
 
   // Auto-select first slot as soon as availableSlots populate
   useEffect(() => {
@@ -1403,7 +1410,7 @@ export default function PatientPortalPage() {
                   onChange={(e) => setSelectedService(e.target.value)}
                   className="w-full text-xs border border-slate-200 rounded-xl p-3 bg-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium"
                 >
-                  {!selectedService && <option value="">Select Medical Service...</option>}
+                  {services.length === 0 && <option value="">Loading medical services...</option>}
                   {services.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name} • {s.durationMinutes} mins ({Number(s.price).toFixed(2)} ETB)
@@ -1428,7 +1435,7 @@ export default function PatientPortalPage() {
                   onChange={(e) => setSelectedDoctor(e.target.value)}
                   className="w-full text-xs border border-slate-200 rounded-xl p-3 bg-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium"
                 >
-                  {!selectedDoctor && <option value="">Select Physician / Specialist...</option>}
+                  {doctors.length === 0 && <option value="">Loading attending physicians...</option>}
                   {doctors.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.fullName} — {d.specialty}

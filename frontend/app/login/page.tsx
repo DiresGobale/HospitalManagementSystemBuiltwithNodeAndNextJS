@@ -56,12 +56,15 @@ function LoginFormContent() {
     }
   }, [initialEmail]);
 
-  // If already authenticated, redirect to respective role dashboard
+  // If already authenticated and has a valid token, redirect to respective role dashboard (unless just registered)
   useEffect(() => {
-    if (user && activeMembership?.role) {
-      router.push(getRoleDashboardPath(activeMembership.role));
+    if (!isNewlyRegistered && user && activeMembership?.role) {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('caqms_access_token') : null;
+      if (token) {
+        router.push(getRoleDashboardPath(activeMembership.role));
+      }
     }
-  }, [user, activeMembership, router]);
+  }, [user, activeMembership, isNewlyRegistered, router]);
 
   // Handle Login submission
   const handleLoginSubmit = async (e: React.FormEvent) => {

@@ -4,12 +4,13 @@ export async function apiFetch<T = any>(
   endpoint: string,
   options: RequestInit & { clinicId?: string } = {}
 ): Promise<{ success: boolean; data?: T; message?: string; error?: any }> {
+  const { clinicId: explicitClinicId, ...fetchOptions } = options;
   const token = typeof window !== 'undefined' ? localStorage.getItem('caqms_access_token') : null;
-  const clinicId = options.clinicId || (typeof window !== 'undefined' ? localStorage.getItem('caqms_active_clinic_id') : null);
+  const clinicId = explicitClinicId || (typeof window !== 'undefined' ? localStorage.getItem('caqms_active_clinic_id') : null);
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
+    ...(fetchOptions.headers as Record<string, string>),
   };
 
   if (token) {
@@ -22,7 +23,7 @@ export async function apiFetch<T = any>(
 
   try {
     const res = await fetch(`${API_BASE_URL}${endpoint}`, {
-      ...options,
+      ...fetchOptions,
       headers,
     });
 
